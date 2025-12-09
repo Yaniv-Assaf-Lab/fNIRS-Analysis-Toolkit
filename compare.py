@@ -14,6 +14,8 @@ export_dir = os.getenv("EXPORT_DIR")
 filter_window = float(os.getenv("FILTER_WINDOW", "0"))  # default: no filter
 bandgap_freq = float(os.getenv("BANDGAP_FREQ", "0"))  # default: no filter
 bandgap_q = float(os.getenv("BANDGAP_Q", "0"))  # default: no filter
+p_value_threshold = 0.05
+
 
 def normalize_segments(segments):
     """Resample segments to shortest length, then z-score normalize each."""
@@ -83,7 +85,7 @@ def analyze_correlations(stacks, set_names, column_names):
                 sensor_corrs = []
                 for ch in range(num_sensors):
                     r, pvalue = pearsonr(means[i][:, ch], means[j][:, ch])
-                    if(pvalue < 0.05):
+                    if(pvalue < p_value_threshold):
                         sensor_corrs.append(r)
                         # print(f"channel {ch}, pvalue {pvalue}")
                     else:
@@ -218,9 +220,10 @@ def main(file_paths):
 
     # 1. Process all files
     for f in file_paths[1:]:
-        df, marker_indices, column_names, sample_rate = load_file(f)
+        df, marker_indices, column_names_internal, sample_rate = load_file(f)
         if(sample_rate == 0):
             continue
+        column_names = column_names_internal
         df = apply_filtering(df, filter_window, sample_rate, bandgap_freq, bandgap_q)
 
         segments = extract_segments(df, marker_indices)

@@ -43,13 +43,14 @@ def load_snirf_file(file_path):
 
     raw_intensity = mne.io.read_raw_snirf(file_path, preload=True)
     raw_od = mne.preprocessing.nirs.optical_density(raw_intensity)
-    raw_haemo = mne.preprocessing.nirs.beer_lambert_law(raw_od, ppf=dpf) # ppf= 4.49 + 0.067 * age ** 0.814
+    raw_haemo = mne.preprocessing.nirs.beer_lambert_law(raw_od, ppf=dpf) # ppf = 4.49 + 0.067 * age ** 0.814
     data_micromolar = raw_haemo.get_data() * 1e6
     column_names = []
     events = []
     for array in snirf_data.nirs[0].stim:
         events.extend(map(lambda x: int(x*sample_rate), array.data[:, 0]))
 
+    events.extend([data_micromolar.shape[1], -1])
     events.sort()
     for i in range(0, 16):
         source = snirf_data.nirs[0].data[0].measurementList[i].sourceIndex
@@ -67,6 +68,7 @@ def load_file(file_path):
     extension.lower()
     if(extension == ".snirf"):   
         df, marker_indices, column_names, sample_rate = load_snirf_file(file_path)
+        
     elif(extension == ".xml"):     
         df, marker_indices, column_names, sample_rate = load_artinis_xml(file_path)
     else:
