@@ -2,146 +2,91 @@
 import sys
 import os
 import numpy as np
-import numpy as np
-from scipy.interpolate import interp1d
 from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
+import matplotlib.widgets as mwidgets
+import itertools
 from pathlib import Path
-from load import load_file
-from filtering import apply_filtering, extract_segments
-src = sys.argv[1]  # existing positional argument
-export_dir = os.getenv("EXPORT_DIR")
-filter_window = float(os.getenv("FILTER_WINDOW", "0"))  # default: no filter
-bandgap_freq = float(os.getenv("BANDGAP_FREQ", "0"))  # default: no filter
-bandgap_q = float(os.getenv("BANDGAP_Q", "0"))  # default: no filter
+import argparse
+
 p_value_threshold = 0.05
 
-
-def normalize_segments(segments):
-    """Resample segments to shortest length, then z-score normalize each."""
-    target_len = 25*20
-    normalized = []
-
-    for seg in segments:
-        x_old = np.linspace(0, 1, len(seg))
-        x_new = np.linspace(0, 1, target_len)
-        interp = interp1d(x_old, seg.values, axis=0, kind='linear')
-        resampled = interp(x_new)
-        resampled = (resampled - resampled.mean(axis=0)) 
-        normalized.append(resampled)
-
-    return np.stack(normalized)
-
-# ---------- STATISTICS & CORRELATION (NEW) ----------
-
-def analyze_correlations(stacks, set_names, column_names):
+def plot_correlations(stacks, set_names, analysis_mode):
     """
-    Calculates Pearson correlation between the mean trajectories of different files.
-    1. Prints a table of per-sensor correlations if comparing 2 files.
-    2. Plots a heatmap matrix of average correlations between all files.
+    Calculates Pearson correlation between mean trajectories.
+    Works for both 16-channel and 8-channel.
     """
     num_sets = len(stacks)
-    if num_sets < 2:
-        print("Need at least 2 datasets to calculate correlation.")
-        return
-
-    # Calculate mean signal (Time x Sensors) for each subject/file
-    # means[i] is the average response for file i
+    differential = True if (analysis_mode != None) else False 
+    # means[i] shape: (Time, Sensors)
     means = [s.mean(axis=0) for s in stacks] 
     num_sensors = means[0].shape[1]
-
-    # --- 1. Console Output (Detailed) ---
-    # print("\n" + "="*40)
-    # print("       PEARSON CORRELATION ANALYSIS       ")
-    # print("="*40)
     
-    # If exactly 2 files, give granular per-sensor detail
-    if num_sets == 2:
-        print(f"\nComparing: '{set_names[0]}' vs '{set_names[1]}'")
-        print(f"{'Sensor':<15} | {'Correlation (r)':<15}")
-        print("-" * 35)
-        
-        corrs = []
-        for ch in range(num_sensors):
-            # Calculate r for this specific sensor between file 0 and file 1
-            r, pvalue = pearsonr(means[0][:, ch], means[1][:, ch])
-            corrs.append(r)
-            # print(f"{column_names[ch][:12]:<15} | {r:.4f}")
-        
-        print("-" * 35)
-        print(f"{'AVERAGE':<15} | {np.mean(corrs):.4f}")
+    # Define p-value threshold (adjust if this is a global variable in your script)
+    p_thresh = 0.05
 
-    # --- 2. Matrix Calculation (Global Similarity) ---
-    # We calculate a matrix where Cell [i,j] is the average correlation 
-    # across all sensors between File i and File j.
+    # --- Matrix Calculation ---
     corr_matrix = np.zeros((num_sets, num_sets))
-
     for i in range(num_sets):
         for j in range(num_sets):
             if i == j:
-                corr_matrix[i, j] = 1.0
+                corr_matrix[i, j] = 100.0
             else:
-                # Calculate r for every sensor, then average them
                 sensor_corrs = []
                 for ch in range(num_sensors):
                     r, pvalue = pearsonr(means[i][:, ch], means[j][:, ch])
-                    if(pvalue < p_value_threshold):
-                        sensor_corrs.append(r)
-                        # print(f"channel {ch}, pvalue {pvalue}")
-                    else:
-                        sensor_corrs.append(0)
+                    # Only include significant correlations, else treat as 0
+                    sensor_corrs.append((100 * r) if pvalue < p_thresh else 0)
                 corr_matrix[i, j] = np.mean(sensor_corrs)
 
-    # --- 3. Plot Heatmap ---
-    fig, ax = plt.subplots(figsize=(6 + num_sets, 5 + num_sets * 0.5))
-    im = ax.imshow(corr_matrix, cmap='RdYlGn', vmin=-1, vmax=1)
     
-    # Add colorbar
+    # --- Plot Heatmap ---
+    fig, ax = plt.subplots(figsize=(8, 7))
+    im = ax.imshow(corr_matrix, cmap='RdYlGn', vmin=-100, vmax=100)
+    
     cbar = ax.figure.colorbar(im, ax=ax)
-    cbar.ax.set_ylabel("Pearson Correlation (r)", rotation=-90, va="bottom")
+    cbar.ax.set_ylabel("Avg Pearson Correlation (r)", rotation=-90, va="bottom")
 
-    # Show all ticks and label them
     ax.set_xticks(np.arange(num_sets))
     ax.set_yticks(np.arange(num_sets))
-    ax.set_xticklabels(set_names)
+    ax.set_xticklabels(set_names, rotation=45, ha="right")
     ax.set_yticklabels(set_names)
 
-    # Rotate the tick labels and set their alignment.
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
-
-    # Loop over data dimensions and create text annotations.
     for i in range(num_sets):
         for j in range(num_sets):
-            text = ax.text(j, i, f"{corr_matrix[i, j]:.2f}",
-                           ha="center", va="center", color="black", fontweight="bold")
+            ax.text(j, i, f"{corr_matrix[i, j]:.0f}",
+                    ha="center", va="center", color="black", fontweight="bold")
 
-    ax.set_title("Average Signal Correlation Between Subjects")
+    title_suffix = f"(Differential 8-Ch, mode = {analysis_mode})" if differential else "(Raw 16-Ch)"
+    ax.set_title(f"Signal Correlation Between Subjects\n{title_suffix}")
     fig.tight_layout()
-    plt.subplots_adjust(bottom=0.2)
 
 
 # ---------- PLOTTING ----------
 
-def plot_segments(stacks, column_names, set_names=None):
-    import matplotlib.widgets as mwidgets
-    import itertools
-
+def plot_segments(stacks, column_names, analysis_mode, set_names=None):
+   
     num_sets = len(stacks)
     if set_names is None:
         set_names = [f"Set {i+1}" for i in range(num_sets)]
 
+    # Detect if we have 8 (subtracted) or 16 (raw) channels
     num_sensors = stacks[0].shape[2]
     example_mean = stacks[0].mean(axis=0)
     T = example_mean.shape[0]
     time = np.linspace(0, 1, T)
 
-    rows, cols = 4, 4
+    # --- Dynamic Grid Logic ---
+    if analysis_mode != None:
+        rows, cols = 4, 2
+    else:
+        rows, cols = 4, 4
+    
     fig, axes = plt.subplots(rows, cols, figsize=(12, 3 * rows), sharex=True)
     axes = axes.flatten()
 
     base_colors = plt.cm.tab10.colors
     set_colors = list(itertools.islice(itertools.cycle(base_colors), num_sets))
-
     lines_per_set = [[] for _ in range(num_sets)]
 
     for ch in range(num_sensors):
@@ -149,32 +94,39 @@ def plot_segments(stacks, column_names, set_names=None):
         for set_idx, stacked in enumerate(stacks):
             mean_seg = stacked.mean(axis=0)
             curve = mean_seg[:, ch]
+            
+            # Plot mean trajectory
             line, = ax.plot(
                 time,
                 curve,
                 color=set_colors[set_idx],
-                label=set_names[set_idx] if ch == 0 else None
+                label=set_names[set_idx] if ch == 0 else None,
+                alpha=0.8
             )
             lines_per_set[set_idx].append(line)
 
-        ax.set_title(column_names[ch][:12])
-        ax.set_ylabel("Norm. Change")
-        ax.grid(True)
+        # Use the provided column names (8 names if subtracted, 16 if not)
+        title = column_names[ch] if ch < len(column_names) else f"Ch {ch}"
+        ax.set_title(title[:20], fontsize=10)
+        ax.set_ylabel("Norm. Δ")
+        ax.grid(True, linestyle='--', alpha=0.6)
 
+    # Hide unused subplots if num_sensors is not a multiple of grid size
     for ax in axes[num_sensors:]:
         fig.delaxes(ax)
 
+    # Adjust legend and layout
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper center', ncol=num_sets)
+    fig.legend(handles, labels, loc='upper center', ncol=min(num_sets, 4), fontsize='small')
 
     plt.xlabel("Normalized Time (0 → 1)")
-    plt.tight_layout(rect=[0, 0.05, 1, 0.92])
+    plt.tight_layout(rect=[0, 0.05, 1, 0.94])
 
-    # --- Toggle buttons ---
-    button_height = 0.025
-    button_width = 0.1
-    spacing = 0.012
-    start_x = 0.02
+    # --- Interactive Toggle Buttons ---
+    button_height = 0.03
+    button_width = 1 / (1.3 * num_sets)
+    spacing = 0.01
+    start_x = 0.05
     start_y = 0.01
 
     def make_toggle_callback(lines):
@@ -182,69 +134,111 @@ def plot_segments(stacks, column_names, set_names=None):
             visible = not lines[0].get_visible()
             for l in lines:
                 l.set_visible(visible)
+                # If you added fill_betweens later, toggle them here too
             plt.draw()
         return callback
 
     buttons = [] 
     for i, set_name in enumerate(set_names):
+        # Prevent buttons from overlapping or going off-screen
         ax_button = fig.add_axes([start_x + i*(button_width+spacing), start_y, button_width, button_height])
-        button = mwidgets.Button(ax_button, f"{set_name}")
+        button = mwidgets.Button(ax_button, f"{set_name}", color='lightgray', hovercolor='0.975')
         button.on_clicked(make_toggle_callback(lines_per_set[i]))
         buttons.append(button)
 
     fig._buttons = buttons 
-
-    # Handle export
+    
+    # Export logic
     if len(sys.argv) > 1:
         src = sys.argv[1]
-        name = Path(src).stem
+        name = f"{Path(src).stem}_comparison"
     else:
-        name = "output"
+        name = "multi_subject_plot"
     
-    export_dir = locals().get('export_dir', None) # Safety for local scope vs global
-
-    if export_dir:
-        Path(export_dir).mkdir(parents=True, exist_ok=True)
-        outfile = Path(export_dir) / (name + ".png")
-        plt.savefig(str(outfile))
-    
-    # We do NOT call plt.show() here yet, because we want the correlation plot to show up too
-
+    # Note: Ensure export_dir is accessible (passed as arg or global)
+    if 'export_dir' in globals() and globals()['export_dir']:
+        path = Path(globals()['export_dir'])
+        path.mkdir(parents=True, exist_ok=True)
+        plt.savefig(path / f"{name}.png")
 
 # ---------- MAIN ----------
 
-def main(file_paths):
+
+
+def main(args):
+    file_paths = []
+    with os.scandir(args["input_dir"]) as dir:
+        for entry in dir:
+            if entry.is_file():
+                file_paths.append(os.path.join(args["input_dir"], entry.name))
+                
+    # Use a list to store objects containing (skill, stack, name)
+    processed_data = []
+    column_names = ""
+    analysis_mode = None
+    # 1. Process all files
+    for f in file_paths:
+        data = np.load(f, allow_pickle=True)
+        stack = data["stack"]
+        column_names = data["column_names"]
+        trial = data["trial"]
+        analysis_mode = data["mode"]
+        subject = data["subject"].item()
+        id = data["id"]
+
+        if(subject == 0):
+            print(f"Subject not found: {f}")
+            exit(1)
+        
+        # 3. Store as a tuple to keep them linked
+        processed_data.append({
+            'stack': stack,
+            'id': id,
+            'subject': subject,
+            'trial': trial
+        })
+
+    # 2. Sort the entire list by the 'skill' key
+    # Change reverse=True if you want most experienced first
+    if(args["sort"]):
+        processed_data.sort(key=lambda x: x["subject"][args["sort"]], reverse = True)
+
+    if(args["filter"]):
+        field, value = args["filter"]
+        processed_data = [
+            item for item in processed_data
+            if item["subject"].get(field) == value
+        ]
+
+    # 3. Unpack into separate lists for the correlation function
     stacks = []
     set_names = []
-    column_names = ""
+    for item in processed_data:
+        stacks.append(item['stack'])
+        subj = item['subject']
+        if(args["sort"]):
+            set_names.append(f"{item['id']}_{item['trial']} ({subj[args["sort"]]})")
+        else:
+            set_names.append(f"{item['id']}_{item['trial']}")
 
-    # 1. Process all files
-    for f in file_paths[1:]:
-        df, marker_indices, column_names_internal, sample_rate = load_file(f)
-        if(sample_rate == 0):
-            continue
-        column_names = column_names_internal
-        df = apply_filtering(df, filter_window, sample_rate, bandgap_freq, bandgap_q)
-
-        segments = extract_segments(df, marker_indices)
-        stacked = normalize_segments(segments)
-
-        stacks.append(stacked)
-        set_names.append(Path(f).stem)  
-
-    # 2. Analyze Correlations (New Step)
-    if len(stacks) > 1:
-        analyze_correlations(stacks, set_names, column_names)
-
-    # 3. Plot Main Data
-    plot_segments(stacks, column_names, set_names=set_names)
-
-    # Final show for all figures generated
+    # Analyze Correlations
+    if args["mode"] == "correlate":
+        plot_correlations(stacks, set_names, analysis_mode)
+    if args["mode"] == "plot":
+        # If you also want to plot the segments
+        # (Kinda broken for many participants)
+        plot_segments(stacks, column_names, analysis_mode, set_names)
     plt.show()
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python script.py data1.xml data2.xml ...")
-        sys.exit(1)
-    main(sys.argv)
+    parser = argparse.ArgumentParser(
+                    prog='fNIRS-analyze',
+                    description='Analyzer for fNIRS data')
+
+    parser.add_argument('input_dir')
+    parser.add_argument('-m', '--mode', metavar = 'mode', required = True, choices=['plot', 'correlate'])
+    parser.add_argument('-s', '--sort', metavar = 'sort', choices=["age", "skill", "belt", "gender", "handedness"])
+    parser.add_argument('-f', '--filter', metavar=("field", "value"), nargs = 2)
+    args = vars(parser.parse_args(sys.argv[1:]))
+    main(args)
