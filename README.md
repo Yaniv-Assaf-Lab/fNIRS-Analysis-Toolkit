@@ -23,7 +23,7 @@ These are fields that are useful for our research specifically, but you are welc
 Then, you will need a directory (set up as `data` in the makefile) which holds the subject's fNIRS data, in the Artinis OxySoft XML format, or a `.snirf` format. The file names for these must be in the following format:
 
 ```
-<SUBJECT_ID>_<TRIAL>.snirf/.xml
+<SUBJECT_ID> <TRIAL>.snirf/.xml
 ```
 
 Then, make sure the parameters in the makefile are satisfactory, install all of the Python libraries required to run the tools, and analyze to your heart's content.
