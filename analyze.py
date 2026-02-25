@@ -61,13 +61,16 @@ def main(args):
         df, marker_indices, column_names, sample_rate = load_file(f)
         if sample_rate == 0:
             continue
-            
+        
         df = apply_filtering(df, args["window"], sample_rate, args["bandgap"][0], args["bandgap"][1])
 
         segments = extract_segments(df, marker_indices)
+        column_names = [column[:9] for column in column_names]
         if (args["mode"] == "subtract"):
             subtract_channels(segments, args["factor"])
+            column_names = column_names[::2]
         if (args["mode"] == "divide"):
+            column_names = column_names[::2]
             divide_channels(segments)
         
         stacked = normalize_segments(segments)
@@ -91,15 +94,22 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-                    prog='fNIRS-analyze',
                     description='Analyzer for fNIRS data')
 
     parser.add_argument('input_dir')
     parser.add_argument('output_dir')
-    parser.add_argument('-m', '--mode', metavar = 'mode', required = False, choices = ['subtract', 'divide'])
-    parser.add_argument('-f', '--factor', metavar = 'factor', type=float)     
-    parser.add_argument('-w', '--window', metavar = 'length', type=float, default = 0)
-    parser.add_argument('-b', '--bandgap', nargs = 2, metavar=('freqeuncy', 'q_factor'), type=float, required = False, default = [0, 0])      
+    parser.add_argument('-m', '--mode', metavar = 'mode', required = False, choices = ['subtract', 'divide'], help = 
+                        "Selects the differential analysis mode. Choosing \"subtract\" will subtract the O2Hb and HHb channels, and \"divide\" will divide them."
+                        )
+    parser.add_argument('-f', '--factor', metavar = 'factor', type=float, help = 
+                        "If the \"subtract\" mode is selected, this parameter controls the factor by which the HHb channel is multiplied. Default is a normalization to the standard deviation of the O2Hb signal."
+                        )     
+    parser.add_argument('-w', '--window', metavar = 'length', type=float, default = 0, help = 
+                        "This parameter adds a moving window average, with variable length."
+                        )
+    parser.add_argument('-b', '--bandgap', nargs = 2, metavar=('freqeuncy', 'q_factor'), type=float, required = False, default = [0, 0], help = 
+                        "These 2 parameters control a band-gap (also called band-stop) filter to the data, mostly for heart beat mitigation."
+                        )      
     args = vars(parser.parse_args(sys.argv[1:]))
 
     main(args)

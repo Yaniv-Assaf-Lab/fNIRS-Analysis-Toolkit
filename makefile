@@ -1,4 +1,3 @@
-# Best settings I found:
 RAW_DIR := data
 ANALYZED_DIR := data_out
 IMG_DIR := images
@@ -8,13 +7,17 @@ FILE:=""
 # number of parallel workers: 0 = as many as possible; replace with 4 to limit
 PARALLEL := 0
 
+# On Ubuntu, if this script does not work for you, add the line:
+# export QT_QPA_PLATFORM=wayland
+# To your ~/.bashrc file, and reload the terminal
+
 graph:
 	@find "$(ANALYZED_DIR)" -type f -name '*' -print0 | \
-	xargs -0 -P $(PARALLEL) -I{} sh -c 'QT_QPA_PLATFORM=wayland ./graph.py "$$1"' _ {}
+	xargs -0 -P $(PARALLEL) -I{} sh -c ' ./graph.py "$$1"' _ {}
 
 save_graphs: | $(IMG_DIR)
 	@find "$(ANALYZED_DIR)" -type f -name '*' -print0 | \
-	xargs -0 -P $(PARALLEL) -I{} sh -c 'QT_QPA_PLATFORM=wayland ./graph.py -o $(IMG_DIR) "$$1"' _ {}
+	xargs -0 -P $(PARALLEL) -I{} sh -c ' ./graph.py -o $(IMG_DIR) "$$1"' _ {}
 
 analyze:
 	./analyze.py $(RAW_DIR) $(ANALYZED_DIR) $(ANALYZE_OPTIONS)
@@ -23,11 +26,28 @@ analyze-div:
 	./analyze.py $(RAW_DIR) $(ANALYZED_DIR) $(ANALYZE_OPTIONS_DIV)
 
 plot:
-	QT_QPA_PLATFORM=wayland ./compare.py -m plot $(ANALYZED_DIR)
+	./correlate.py -m plot $(ANALYZED_DIR)
 
 correlate:
-	QT_QPA_PLATFORM=wayland ./compare.py -m correlate -s skill $(ANALYZED_DIR)
+	./correlate.py -s skill $(ANALYZED_DIR)
 
+correlate-split:
+	./correlate.py -s skill --split $(ANALYZED_DIR) --save $(IMG_DIR)
+
+correlate-blck:
+	./correlate.py -s skill -f belt blck $(ANALYZED_DIR)
+
+correlate-brwn:
+	./correlate.py -s skill -f belt brwn $(ANALYZED_DIR)
+
+correlate-prpl:
+	./correlate.py -s skill -f belt prpl $(ANALYZED_DIR)
+
+correlate-blue:
+	./correlate.py-s skill -f belt blue $(ANALYZED_DIR)
+
+correlate-whte:
+	./correlate.py -s skill -f belt whte $(ANALYZED_DIR)
 
 edit:
 	@./view.py "$(FILE)"

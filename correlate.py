@@ -1,0 +1,228 @@
+#!/usr/bin/python
+import sys
+import os
+import numpy as np
+from scipy.stats import pearsonr
+import matplotlib.pyplot as plt
+import matplotlib.widgets as mwidgets
+import itertools
+from pathlib import Path
+import argparse
+
+p_value_threshold = 0.05
+
+def plot_correlations(stacks, set_names, analysis_mode, output_dir):
+    """
+    Calculates Pearson correlation between mean trajectories.
+    Works for both 16-channel and 8-channel.
+    """
+    num_sets = len(stacks)
+    differential = True if (analysis_mode != None) else False 
+    # means[i] shape: (Time, Sensors)
+    means = [s.mean(axis=0) for s in stacks] 
+    num_sensors = means[0].shape[1]
+    
+    # Define p-value threshold (adjust if this is a global variable in your script)
+    p_thresh = 0.05
+
+    # --- Matrix Calculation ---
+    corr_matrix = np.zeros((num_sets, num_sets))
+    for i in range(num_sets):
+        for j in range(num_sets):
+            if i == j:
+                corr_matrix[i, j] = 100.0
+            else:
+                sensor_corrs = []
+                for ch in range(num_sensors):
+                    r, pvalue = pearsonr(means[i][:, ch], means[j][:, ch])
+                    # Only include significant correlations, else treat as 0
+                    sensor_corrs.append((100 * r) if pvalue < p_thresh else 0)
+                corr_matrix[i, j] = np.mean(sensor_corrs)
+
+    
+    # --- Plot Heatmap ---
+    fig, ax = plt.subplots(figsize=(8, 7))
+    im = ax.imshow(corr_matrix, cmap='RdYlGn', vmin=-100, vmax=100)
+    
+    cbar = ax.figure.colorbar(im, ax=ax)
+    cbar.ax.set_ylabel("Avg Pearson Correlation (r)", rotation=-90, va="bottom")
+
+    ax.set_xticks(np.arange(num_sets))
+    ax.set_yticks(np.arange(num_sets))
+    ax.set_xticklabels(set_names, rotation=45, ha="right")
+    ax.set_yticklabels(set_names)
+
+    for i in range(num_sets):
+        for j in range(num_sets):
+            ax.text(j, i, f"{corr_matrix[i, j]:.0f}",
+                    ha="center", va="center", color="black", fontweight="bold")
+
+    title_suffix = f"(Differential 8-Ch, mode = {analysis_mode})" if differential else "(Raw 16-Ch)"
+    ax.set_title(f"Signal Correlation Between Subjects\n{title_suffix}")
+
+    fig.tight_layout()
+    if(output_dir):
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        outfile = Path(output_dir) / f"correlations_{analysis_mode}.png"
+        plt.savefig(str(outfile), dpi=200) # Higher DPI for "meaningful" reports
+        print(f"Plot saved to: {outfile}")
+    else:
+       plt.show() 
+
+def plot_correlations_per_sensor(stacks, set_names, analysis_mode, column_names, output_dir):
+    """
+    Calculates Pearson correlation between mean trajectories
+    and opens one NON-BLOCKING window per sensor.
+    """
+    plt.ion()  # Turn on interactive mode
+
+    num_sets = len(stacks)
+    differential = True if (analysis_mode is not None) else False
+    means = [s.mean(axis=0) for s in stacks]
+    num_sensors = means[0].shape[1]
+
+    p_thresh = 0.05
+
+    # Compute correlation matrices per sensor
+    corr_matrices = np.zeros((num_sensors, num_sets, num_sets))
+
+    for ch in range(num_sensors):
+        for i in range(num_sets):
+            for j in range(num_sets):
+                if i == j:
+                    corr_matrices[ch, i, j] = 100.0
+                else:
+                    r, pvalue = pearsonr(means[i][:, ch], means[j][:, ch])
+                    corr_matrices[ch, i, j] = (100 * r) if pvalue < p_thresh else 0
+
+    # ---- Open separate NON-BLOCKING window per sensor ----
+    for ch in range(num_sensors):
+        plt.rcParams["figure.dpi"] = 67
+        px = 1/plt.rcParams['figure.dpi']  # pixel in inches
+        fig, ax = plt.subplots(figsize=(1024*px, 720*px)) #(width, height)
+        fig.canvas.manager.set_window_title(f"Sensor {ch+1}: {column_names[ch]}")
+
+        im = ax.imshow(corr_matrices[ch], cmap='RdYlGn', vmin=-100, vmax=100)
+
+        cbar = fig.colorbar(im, ax=ax)
+        cbar.set_label("Pearson Correlation (r) × 100")
+
+        ax.set_xticks(np.arange(num_sets))
+        ax.set_yticks(np.arange(num_sets))
+        ax.set_xticklabels(set_names, rotation=45, ha="right")
+        ax.set_yticklabels(set_names)
+
+        for i in range(num_sets):
+            for j in range(num_sets):
+                ax.text(j, i, f"{corr_matrices[ch, i, j]:.0f}",
+                        ha="center", va="center",
+                        color="black", fontweight="bold")
+
+        title_suffix = (
+            f"(Differential 8-Ch, mode = {analysis_mode})"
+            if differential else
+            "(Raw 16-Ch)"
+        )
+
+        ax.set_title(f"Signal Correlation Between Subjects\n"
+                     f"Sensor {ch+1} {title_suffix}")
+
+        fig.tight_layout()
+
+        if(output_dir):
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+            
+            outfile = Path(output_dir) / f"correlations_{analysis_mode}_{column_names[ch]}.png"
+            plt.savefig(str(outfile), dpi=200) # Higher DPI for "meaningful" reports
+            print(f"Plot saved to: {outfile}")
+        else:
+            plt.show(block=False)  # <- Non-blocking
+            plt.pause(0.1)         # <- Ensures window renders properly
+
+    plt.show(block=True)
+    
+
+# ---------- MAIN ----------
+
+def main(args):
+    file_paths = []
+    with os.scandir(args["input_dir"]) as dir:
+        for entry in dir:
+            if entry.is_file():
+                file_paths.append(os.path.join(args["input_dir"], entry.name))
+                
+    # Use a list to store objects containing (skill, stack, name)
+    processed_data = []
+    column_names = ""
+    analysis_mode = None
+    # 1. Process all files
+    for f in file_paths:
+        data = np.load(f, allow_pickle=True)
+        stack = data["stack"]
+        column_names = data["column_names"]
+        trial = data["trial"]
+        analysis_mode = data["mode"]
+        subject = data["subject"].item()
+        id = data["id"]
+
+        if(subject == 0):
+            print(f"Subject not found: {f}")
+            exit(1)
+        
+        # 3. Store as a tuple to keep them linked
+        processed_data.append({
+            'stack': stack,
+            'id': id,
+            'subject': subject,
+            'trial': trial
+        })
+
+    # 2. Sort the entire list by the 'skill' key
+    # Change reverse=True if you want most experienced first
+    if(args["sort"]):
+        processed_data.sort(key=lambda x: x["subject"][args["sort"]], reverse = True)
+
+    if(args["filter"]):
+        field, value = args["filter"]
+        processed_data = [
+            item for item in processed_data
+            if item["subject"].get(field) == value
+        ]
+
+    # 3. Unpack into separate lists for the correlation function
+    stacks = []
+    set_names = []
+    for item in processed_data:
+        stacks.append(item['stack'])
+        subj = item['subject']
+        if(args["sort"]):
+            set_names.append(f"{item['id']}_{item['trial']} ({subj[args["sort"]]})")
+        else:
+            set_names.append(f"{item['id']}_{item['trial']}")
+
+    # Analyze Correlations
+    if args["split"]:
+        plot_correlations_per_sensor(stacks, set_names, analysis_mode, column_names, args["save"])
+    else:
+        plot_correlations(stacks, set_names, analysis_mode, args["save"])
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+                    description='View correlations between all subjects in a directory')
+
+    parser.add_argument('input_dir')
+    parser.add_argument('-s', '--sort', metavar = 'sort', choices=["age", "skill", "belt", "gender", "handedness"], help = 
+                        "Allows sorting by a specified parameter"
+                        )
+    parser.add_argument('-f', '--filter', metavar=("field", "value"), nargs = 2, help = 
+                        "Allows filtering by a specified field and value"
+                        )
+    parser.add_argument('-p', '--split', action=argparse.BooleanOptionalAction, default = False, help = 
+                        "Normally the correlation is averaged between all channels, in order to create one correlation matrix. Enabling this option allows for the creation of separate correlation matrices, one for each sensor channel."
+                        )
+    parser.add_argument('-a', '--save', metavar='save_dir', help = 
+                        "Allows saving of the resulting matrix to an image."
+                        )
+    args = vars(parser.parse_args(sys.argv[1:]))
+    main(args)

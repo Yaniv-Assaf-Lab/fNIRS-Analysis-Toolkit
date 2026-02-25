@@ -8,10 +8,11 @@ from pathlib import Path
 
 # ---------- UNIFIED PLOTTING ----------
 
-def plot_data(stacked, column_names, name, mode, skill, output_dir):
+def plot_data(stacked, column_names, id, mode, subject, output_dir):
     """
     Unified plotter with descriptive titles for the figure and subplots.
     """
+    skill = subject["skill"]
     target_len = stacked.shape[1]
     num_sensors = stacked.shape[2]
     time = np.linspace(0, 1, target_len)
@@ -23,10 +24,10 @@ def plot_data(stacked, column_names, name, mode, skill, output_dir):
     # --- Meaningful Figure Title ---
     # Capitalize mode for better presentation
     display_mode = str(mode).capitalize()
-    main_title = f"fNIRS Analysis: {name}\nSkill Level: {skill}m | Mode: {display_mode}"
+    main_title = f"fNIRS Analysis: {id}\nSkill Level: {skill}m | Mode: {display_mode}"
     fig.suptitle(main_title, fontsize=14, y=0.98)
     
-    fig.canvas.manager.set_window_title(f"{name} - {display_mode}")
+    fig.canvas.manager.set_window_title(f"{id} - {display_mode}")
 
     # Determine mode type
     is_diff_mode = (mode != None)
@@ -40,11 +41,11 @@ def plot_data(stacked, column_names, name, mode, skill, output_dir):
                 mean_vals = stacked.mean(axis=0)[:, i]
                 std_vals = stacked.std(axis=0)[:, i]
                 
-                ax.plot(time, mean_vals, label="$\Delta$ Hb (Diff)", color="teal", linewidth=1.5)
+                ax.plot(time, mean_vals, label=r"$\Delta$ Hb (Diff)", color="teal", linewidth=1.5)
                 ax.fill_between(time, mean_vals - std_vals, mean_vals + std_vals, alpha=0.3, color="teal")
                 
                 # Title based on the pair used for subtraction
-                title_text = column_names[i*2] if (i*2) < len(column_names) else f"Channel {i}"
+                title_text = column_names[i]
                 ax.set_title(f"Channel {i+1}: {title_text[:15]}", fontsize=10)
         else:
             # --- Dual Mode (16 Sensors: O2Hb & HHb) ---
@@ -64,7 +65,7 @@ def plot_data(stacked, column_names, name, mode, skill, output_dir):
             if title_idx < len(column_names):
                 ax.set_title(f"Channel {i+1}: {column_names[title_idx][:15]}", fontsize=10)
 
-        ax.set_ylabel("Norm. $\Delta$ Intensity")
+        ax.set_ylabel(r"Norm. $\Delta$ Intensity")
         ax.grid(True, linestyle='--', alpha=0.4)
         ax.legend(fontsize="small", loc="upper right")
 
@@ -74,7 +75,7 @@ def plot_data(stacked, column_names, name, mode, skill, output_dir):
     if output_dir:
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         suffix = "_diff" if is_diff_mode else ""
-        outfile = Path(output_dir) / f"{name}{suffix}.png"
+        outfile = Path(output_dir) / f"{id}{suffix}.png"
         plt.savefig(str(outfile), dpi=200) # Higher DPI for "meaningful" reports
         print(f"Plot saved to: {outfile}")
     else:
@@ -97,15 +98,15 @@ def main():
         try:
 
             mode = data['mode']
-            name = data['name']
-            skill = data['skill']
+            id = data['id']
+            subject = data['subject'].item()
             
             plot_data(
                 stacked=data['stack'],
                 column_names=data['column_names'],
-                name=name,
+                id=id,
                 mode=mode,
-                skill=skill,
+                subject=subject,
                 output_dir=args.output_dir
             )
         except KeyError as e:
