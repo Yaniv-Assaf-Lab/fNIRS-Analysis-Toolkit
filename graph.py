@@ -1,14 +1,13 @@
 #!/usr/bin/python
-import os
 import sys
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-
+from filenames import generate_title, generate_image_filename
 # ---------- UNIFIED PLOTTING ----------
 
-def plot_data(stacked, column_names, id, mode, subject, output_dir):
+def plot_data(stacked, column_names, id, analysis, subject, output_dir):
     """
     Unified plotter with descriptive titles for the figure and subplots.
     """
@@ -17,25 +16,17 @@ def plot_data(stacked, column_names, id, mode, subject, output_dir):
     num_sensors = stacked.shape[2]
     time = np.linspace(0, 1, target_len)
     
-    # Grid setup: 8 subplots (4 rows, 2 columns)
     fig, axes = plt.subplots(4, 2, figsize=(12, 13), sharex=True)
     axes = axes.flatten()
-    
-    # --- Meaningful Figure Title ---
-    # Capitalize mode for better presentation
-    display_mode = str(mode).capitalize()
-    main_title = f"fNIRS Analysis: {id}\nSkill Level: {skill}m | Mode: {display_mode}"
+
+    main_title = f"fNIRS Analysis: {id}\nSkill Level: {skill}m | {generate_title(analysis)}"
     fig.suptitle(main_title, fontsize=14, y=0.98)
     
-    fig.canvas.manager.set_window_title(f"{id} - {display_mode}")
-
-    # Determine mode type
-    is_diff_mode = (mode != None)
+    fig.canvas.manager.set_window_title(f"{id}")
 
     for i in range(8):
         ax = axes[i]
-        
-        if is_diff_mode:
+        if analysis['transform'] != None:
             # --- Subtract Mode (8 Channels) ---
             if i < num_sensors:
                 mean_vals = stacked.mean(axis=0)[:, i]
@@ -74,8 +65,7 @@ def plot_data(stacked, column_names, id, mode, subject, output_dir):
 
     if output_dir:
         Path(output_dir).mkdir(parents=True, exist_ok=True)
-        suffix = "_diff" if is_diff_mode else ""
-        outfile = Path(output_dir) / f"{id}{suffix}.png"
+        outfile = Path(output_dir) / generate_image_filename(id, analysis)
         plt.savefig(str(outfile), dpi=200) # Higher DPI for "meaningful" reports
         print(f"Plot saved to: {outfile}")
     else:
@@ -97,7 +87,7 @@ def main():
     with np.load(file_path, allow_pickle=True) as data:
         try:
 
-            mode = data['mode']
+            analysis = data['analysis'].item()
             id = data['id']
             subject = data['subject'].item()
             
@@ -105,9 +95,9 @@ def main():
                 stacked=data['stack'],
                 column_names=data['column_names'],
                 id=id,
-                mode=mode,
+                analysis=analysis,
                 subject=subject,
-                output_dir=args.output_dir
+                output_dir=args.output_dir,
             )
         except KeyError as e:
             print(f"Error: Missing key {e} in {file_path.name}")

@@ -34,6 +34,13 @@ def normalize_segments(segments):
 
 
 def main(args):
+
+    analysis = {
+        "transform": args["transform"],
+        "factor": args["factor"],
+        "filters": [args["window"], args["bandgap"]],
+    }
+
     file_paths = []
     with os.scandir(args["input_dir"]) as dir:
         for entry in dir:
@@ -52,8 +59,7 @@ def main(args):
         file_name = os.path.join(args["output_dir"], f"{id}_{trial}.npz")
         if(os.path.isfile(file_name)):
             data = np.load(file_name, allow_pickle=True)
-            analysis_mode = data["mode"]
-            if(analysis_mode == args["mode"]):
+            if(data['analysis'] == analysis):
                 print(f"Subject \"{id}\" already analyzed, skipping... ({i + 1}/{len(file_paths)})")
                 continue
 
@@ -65,18 +71,20 @@ def main(args):
         df = apply_filtering(df, args["window"], sample_rate, args["bandgap"][0], args["bandgap"][1])
 
         segments = extract_segments(df, marker_indices)
-        column_names = [column[:9] for column in column_names]
-        if (args["mode"] == "subtract"):
+
+        channels = [column[:9:2] for column in column_names]
+        sensors = ["O2Hb, HHb"]
+        if(analysis["transform"] != None):
+            column_names = channels
+        else:
+            column_names = [f"{ch} {sensor}" for ch in channels for sensor in sensors]
+        
+        if (analysis['transform'] == "subtract"):
             subtract_channels(segments, args["factor"])
-            column_names = column_names[::2]
-        if (args["mode"] == "divide"):
-            column_names = column_names[::2]
+        if (analysis['transform'] == "divide"):
             divide_channels(segments)
         
         stacked = normalize_segments(segments)
-
-        # Get first and last words of filename
-        
         
         subject = subjects.get(id, 0)
         
@@ -85,7 +93,7 @@ def main(args):
                     stack = stacked, 
                     column_names = column_names,
                     id = id, 
-                    mode = args["mode"],
+                    analysis = analysis,
                     subject = subject,
                     trial = trial)
         print(f"Analyzed subject \"{id}\" ({i + 1}/{len(file_paths)})")
@@ -98,8 +106,8 @@ if __name__ == "__main__":
 
     parser.add_argument('input_dir')
     parser.add_argument('output_dir')
-    parser.add_argument('-m', '--mode', metavar = 'mode', required = False, choices = ['subtract', 'divide'], help = 
-                        "Selects the differential analysis mode. Choosing \"subtract\" will subtract the O2Hb and HHb channels, and \"divide\" will divide them."
+    parser.add_argument('-t', '--transform', metavar = 'transform', required = False, choices = ['subtract', 'divide'], help = 
+                        "Selects the differential analysis transform mode. Choosing \"subtract\" will subtract the O2Hb and HHb channels, and \"divide\" will divide them."
                         )
     parser.add_argument('-f', '--factor', metavar = 'factor', type=float, help = 
                         "If the \"subtract\" mode is selected, this parameter controls the factor by which the HHb channel is multiplied. Default is a normalization to the standard deviation of the O2Hb signal."

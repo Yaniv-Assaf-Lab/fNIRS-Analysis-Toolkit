@@ -4,20 +4,18 @@ import os
 import numpy as np
 from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
-import matplotlib.widgets as mwidgets
-import itertools
 from pathlib import Path
 import argparse
+from filenames import generate_title, generate_image_filename
 
 p_value_threshold = 0.05
 
-def plot_correlations(stacks, set_names, analysis_mode, output_dir):
+def plot_correlations(stacks, set_names, analysis, output_dir):
     """
     Calculates Pearson correlation between mean trajectories.
     Works for both 16-channel and 8-channel.
     """
     num_sets = len(stacks)
-    differential = True if (analysis_mode != None) else False 
     # means[i] shape: (Time, Sensors)
     means = [s.mean(axis=0) for s in stacks] 
     num_sensors = means[0].shape[1]
@@ -57,19 +55,18 @@ def plot_correlations(stacks, set_names, analysis_mode, output_dir):
             ax.text(j, i, f"{corr_matrix[i, j]:.0f}",
                     ha="center", va="center", color="black", fontweight="bold")
 
-    title_suffix = f"(Differential 8-Ch, mode = {analysis_mode})" if differential else "(Raw 16-Ch)"
-    ax.set_title(f"Signal Correlation Between Subjects\n{title_suffix}")
+    ax.set_title(f"Signal Correlation Between Subjects\n{generate_title(analysis)}")
 
     fig.tight_layout()
     if(output_dir):
         Path(output_dir).mkdir(parents=True, exist_ok=True)
-        outfile = Path(output_dir) / f"correlations_{analysis_mode}.png"
+        outfile = Path(output_dir) / generate_image_filename("correlations", analysis)
         plt.savefig(str(outfile), dpi=200) # Higher DPI for "meaningful" reports
         print(f"Plot saved to: {outfile}")
     else:
        plt.show() 
 
-def plot_correlations_per_sensor(stacks, set_names, analysis_mode, column_names, output_dir):
+def plot_correlations_per_sensor(stacks, set_names, analysis, column_names, output_dir):
     """
     Calculates Pearson correlation between mean trajectories
     and opens one NON-BLOCKING window per sensor.
@@ -77,7 +74,6 @@ def plot_correlations_per_sensor(stacks, set_names, analysis_mode, column_names,
     plt.ion()  # Turn on interactive mode
 
     num_sets = len(stacks)
-    differential = True if (analysis_mode is not None) else False
     means = [s.mean(axis=0) for s in stacks]
     num_sensors = means[0].shape[1]
 
@@ -118,21 +114,16 @@ def plot_correlations_per_sensor(stacks, set_names, analysis_mode, column_names,
                         ha="center", va="center",
                         color="black", fontweight="bold")
 
-        title_suffix = (
-            f"(Differential 8-Ch, mode = {analysis_mode})"
-            if differential else
-            "(Raw 16-Ch)"
-        )
 
         ax.set_title(f"Signal Correlation Between Subjects\n"
-                     f"Sensor {ch+1} {title_suffix}")
+                     f"Sensor {ch+1} {generate_title(analysis)}")
 
         fig.tight_layout()
 
         if(output_dir):
             Path(output_dir).mkdir(parents=True, exist_ok=True)
             
-            outfile = Path(output_dir) / f"correlations_{analysis_mode}_{column_names[ch]}.png"
+            outfile = Path(output_dir) / generate_image_filename("correlations", analysis, id = column_names[ch])
             plt.savefig(str(outfile), dpi=200) # Higher DPI for "meaningful" reports
             print(f"Plot saved to: {outfile}")
         else:
@@ -154,14 +145,14 @@ def main(args):
     # Use a list to store objects containing (skill, stack, name)
     processed_data = []
     column_names = ""
-    analysis_mode = None
+    analysis = None
     # 1. Process all files
     for f in file_paths:
         data = np.load(f, allow_pickle=True)
         stack = data["stack"]
         column_names = data["column_names"]
         trial = data["trial"]
-        analysis_mode = data["mode"]
+        analysis = data['analysis'].item()
         subject = data["subject"].item()
         id = data["id"]
 
@@ -195,16 +186,16 @@ def main(args):
     for item in processed_data:
         stacks.append(item['stack'])
         subj = item['subject']
-        if(args["sort"]):
-            set_names.append(f"{item['id']}_{item['trial']} ({subj[args["sort"]]})")
+        if(args['sort']):
+            set_names.append(f"{item['id']}_{item['trial']} ({subj[args['sort']]})")
         else:
             set_names.append(f"{item['id']}_{item['trial']}")
 
     # Analyze Correlations
     if args["split"]:
-        plot_correlations_per_sensor(stacks, set_names, analysis_mode, column_names, args["save"])
+        plot_correlations_per_sensor(stacks, set_names, analysis, column_names, args['save'])
     else:
-        plot_correlations(stacks, set_names, analysis_mode, args["save"])
+        plot_correlations(stacks, set_names, analysis, args['save'])
 
 
 if __name__ == "__main__":
