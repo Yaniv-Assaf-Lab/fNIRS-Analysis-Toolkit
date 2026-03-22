@@ -34,6 +34,9 @@ correlate:
 correlate-split:
 	./correlate.py -s skill --split $(ANALYZED_DIR) --save $(IMG_DIR)
 
+correlate-group:
+	./correlate.py -s skill --group belt $(ANALYZED_DIR)
+
 correlate-blck:
 	./correlate.py -s skill -f belt blck $(ANALYZED_DIR)
 

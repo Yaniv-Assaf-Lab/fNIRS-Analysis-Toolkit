@@ -7,10 +7,40 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import argparse
 from filenames import generate_title, generate_image_filename
+from collections import defaultdict 
 
 p_value_threshold = 0.05
 
-def plot_correlations(stacks, set_names, analysis, output_dir):
+belt_order = [
+    "unkn",
+    "whte",
+    "blue",
+    "prpl",
+    "brwn",
+    "blck"
+]
+
+def group_by_field(processed_data, field):
+    grouped = defaultdict(list)
+
+    for item in processed_data:
+        key = item['subject'][field]
+        grouped[key].append(item['stack'])  # <-- append, not extend
+
+    result = []
+    for key, stack_list in grouped.items():
+        combined_stack = np.concatenate(stack_list, axis=0)
+
+        result.append({
+            'stack': combined_stack,
+            'id': key,
+            'subject': None,
+            'trial': 0
+        })
+
+    return result
+
+def plot_correlations(stacks, set_names, analysis, args):
     """
     Calculates Pearson correlation between mean trajectories.
     Works for both 16-channel and 8-channel.
@@ -58,9 +88,9 @@ def plot_correlations(stacks, set_names, analysis, output_dir):
     ax.set_title(f"Signal Correlation Between Subjects\n{generate_title(analysis)}")
 
     fig.tight_layout()
-    if(output_dir):
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-        outfile = Path(output_dir) / generate_image_filename("correlations", analysis)
+    if(args["save"]):
+        Path(args["save"]).mkdir(parents=True, exist_ok=True)
+        outfile = Path(args["save"]) / generate_image_filename("correlations", analysis)
         plt.savefig(str(outfile), dpi=200) # Higher DPI for "meaningful" reports
         print(f"Plot saved to: {outfile}")
     else:
@@ -171,7 +201,9 @@ def main(args):
     # 2. Sort the entire list by the 'skill' key
     # Change reverse=True if you want most experienced first
     if(args["sort"]):
-        processed_data.sort(key=lambda x: x["subject"][args["sort"]], reverse = True)
+        processed_data.sort(
+            key=lambda x: belt_order.index(x["subject"][args["sort"]]) if x["subject"][args["sort"]] in belt_order else x["subject"][args["sort"]]
+        ,reverse = True)
 
     if(args["filter"]):
         field, value = args["filter"]
@@ -180,30 +212,41 @@ def main(args):
             if item["subject"].get(field) == value
         ]
 
+    if (args['group']):
+        processed_data = group_by_field(processed_data, args['group'])
+        processed_data.sort(
+            key=lambda x: belt_order.index(x['id']) if x['id'] in belt_order else x['id']
+        ,reverse = True)
+
     # 3. Unpack into separate lists for the correlation function
     stacks = []
     set_names = []
     for item in processed_data:
         stacks.append(item['stack'])
         subj = item['subject']
-        if(args['sort']):
+        if(args['sort'] and not args['group']):
             set_names.append(f"{item['id']}_{item['trial']} ({subj[args['sort']]})")
         else:
-            set_names.append(f"{item['id']}_{item['trial']}")
+            if(item['trial'] == 0):
+                set_names.append(f"{item['id']}")
+            else:
+                set_names.append(f"{item['id']}_{item['trial']}")
 
     # Analyze Correlations
     if args["split"]:
         plot_correlations_per_sensor(stacks, set_names, analysis, column_names, args['save'])
     else:
-        plot_correlations(stacks, set_names, analysis, args['save'])
+        plot_correlations(stacks, set_names, analysis, args)
 
 
 if __name__ == "__main__":
+
+    fields = ["age", "skill", "belt", "gender", "handedness"]
     parser = argparse.ArgumentParser(
                     description='View correlations between all subjects in a directory')
 
     parser.add_argument('input_dir')
-    parser.add_argument('-s', '--sort', metavar = 'sort', choices=["age", "skill", "belt", "gender", "handedness"], help = 
+    parser.add_argument('-s', '--sort', metavar = 'sort', choices = fields, help = 
                         "Allows sorting by a specified parameter"
                         )
     parser.add_argument('-f', '--filter', metavar=("field", "value"), nargs = 2, help = 
@@ -211,6 +254,9 @@ if __name__ == "__main__":
                         )
     parser.add_argument('-p', '--split', action=argparse.BooleanOptionalAction, default = False, help = 
                         "Normally the correlation is averaged between all channels, in order to create one correlation matrix. Enabling this option allows for the creation of separate correlation matrices, one for each sensor channel."
+                        )
+    parser.add_argument('-g', '--group', metavar='group', choices = fields, help = 
+                        "Group participants by parameter, and show average correlations between groups. Incompatible with --split."
                         )
     parser.add_argument('-a', '--save', metavar='save_dir', help = 
                         "Allows saving of the resulting matrix to an image."

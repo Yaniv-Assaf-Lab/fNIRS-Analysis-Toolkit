@@ -39,14 +39,14 @@ The analysis tool takes in files using a named format for each subject, cross re
 
 ### Usage
 
-Executing `./analyze.py -h` (or `python analyze.py -h`) in order to get usage information and help.
+Execute `./analyze.py -h` (or `python analyze.py -h`) in order to get usage information and help.
 
 ## Graphing
 
 After analysis, the toolkit includes a tool for graphing a specific subject, for more pinpoint analysis. It can also save the plot as an image, in order to easily send the results to people.
 
 ### Usage
-Executing `./graph.py -h` (or `python graph.py -h`) in order to get usage information and help.
+Execute `./graph.py -h` (or `python graph.py -h`) in order to get usage information and help.
 
 
 ## Correlation
@@ -56,7 +56,7 @@ The toolkit also includes a tool for viewing the correlations between subject's 
 
 ### Usage
 
-Executing `./correlate.py -h` (or `python correlate.py -h`) in order to get usage information and help.
+Execute `./correlate.py -h` (or `python correlate.py -h`) in order to get usage information and help.
 
 
 ## Viewing and Editing

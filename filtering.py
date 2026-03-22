@@ -94,3 +94,4 @@ def divide_channels(segments):
         
         # Replace the DataFrame in the list with the new 8-column version
         segments[i] = pd.DataFrame(new_data)
+
