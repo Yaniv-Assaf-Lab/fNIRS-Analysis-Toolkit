@@ -85,7 +85,7 @@ def plot_correlations(stacks, set_names, analysis, args):
             ax.text(j, i, f"{corr_matrix[i, j]:.0f}",
                     ha="center", va="center", color="black", fontweight="bold")
 
-    ax.set_title(f"Signal Correlation Between Subjects\n{generate_title(analysis)}")
+    ax.set_title(f"Signal Correlation Bet   ween Subjects\n{generate_title(analysis)}")
 
     fig.tight_layout()
     if(args["save"]):
@@ -146,7 +146,7 @@ def plot_correlations_per_sensor(stacks, set_names, analysis, column_names, outp
 
 
         ax.set_title(f"Signal Correlation Between Subjects\n"
-                     f"Sensor {ch+1} {generate_title(analysis)}")
+                     f"Channel {ch+1} | {generate_title(analysis)}")
 
         fig.tight_layout()
 
@@ -185,7 +185,6 @@ def main(args):
         analysis = data['analysis'].item()
         subject = data["subject"].item()
         id = data["id"]
-
         if(subject == 0):
             print(f"Subject not found: {f}")
             exit(1)
@@ -261,5 +260,6 @@ if __name__ == "__main__":
     parser.add_argument('-a', '--save', metavar='save_dir', help = 
                         "Allows saving of the resulting matrix to an image."
                         )
+    
     args = vars(parser.parse_args(sys.argv[1:]))
     main(args)

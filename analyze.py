@@ -71,14 +71,14 @@ def main(args):
         df = apply_filtering(df, args["window"], sample_rate, args["bandgap"][0], args["bandgap"][1])
 
         segments = extract_segments(df, marker_indices)
-
-        channels = [column[:9:2] for column in column_names]
+      
+        channels = [column[:9:2] for column in column_names][::2]
         sensors = ["O2Hb, HHb"]
         if(analysis["transform"] != None):
             column_names = channels
         else:
             column_names = [f"{ch} {sensor}" for ch in channels for sensor in sensors]
-        
+
         if (analysis['transform'] == "subtract"):
             subtract_channels(segments, args["factor"])
         if (analysis['transform'] == "divide"):
