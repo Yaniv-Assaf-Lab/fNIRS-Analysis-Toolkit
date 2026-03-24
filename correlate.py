@@ -85,7 +85,7 @@ def plot_correlations(stacks, set_names, analysis, args):
             ax.text(j, i, f"{corr_matrix[i, j]:.0f}",
                     ha="center", va="center", color="black", fontweight="bold")
 
-    ax.set_title(f"Signal Correlation Bet   ween Subjects\n{generate_title(analysis)}")
+    ax.set_title(f"Signal Correlation Between Subjects\n{generate_title(analysis)}")
 
     fig.tight_layout()
     if(args["save"]):

@@ -29,7 +29,7 @@ analyze-div:
 	./analyze.py $(RAW_DIR) $(ANALYZED_DIR) $(ANALYZE_OPTIONS) --transform divide
 
 correlate:
-	./correlate.py -s skill $(ANALYZED_DIR)
+	./correlate.py -s belt $(ANALYZED_DIR)
 
 correlate-split:
 	./correlate.py -s skill --split $(ANALYZED_DIR) --save $(IMG_DIR)
@@ -47,7 +47,7 @@ correlate-prpl:
 	./correlate.py -s skill -f belt prpl $(ANALYZED_DIR)
 
 correlate-blue:
-	./correlate.py-s skill -f belt blue $(ANALYZED_DIR)
+	./correlate.py -s skill -f belt blue $(ANALYZED_DIR)
 
 correlate-whte:
 	./correlate.py -s skill -f belt whte $(ANALYZED_DIR)

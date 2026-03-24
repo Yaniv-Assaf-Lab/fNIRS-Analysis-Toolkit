@@ -53,7 +53,7 @@ def main(args):
         file_stem = Path(f).stem
         id = file_stem.split(sep = " ")[0]
         trial = 1
-        if file_stem.split()[-1].isnumeric():
+        if (file_stem.split()[-1].isnumeric() and len(file_stem.split()) != 1):
             trial = file_stem.split()[-1]
 
         file_name = os.path.join(args["output_dir"], f"{id}_{trial}.npz")

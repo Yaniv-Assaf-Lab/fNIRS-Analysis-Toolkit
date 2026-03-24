@@ -18,7 +18,7 @@ subjects = {
 }
 ```
 
-These are fields that are useful for our research specifically, but you are welcome to fork this project and modify them however you like, with full instructions [below](#modifying-fields)
+These are fields that are useful for our research specifically, but you are welcome to fork this project and modify them however you like, with full instructions [below](#modifying-fields).
 
 Then, you will need a directory (set up as `data` in the makefile) which holds the subject's fNIRS data, in the Artinis OxySoft XML format, or a `.snirf` format. The file names for these must be in the following format:
 
