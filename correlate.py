@@ -240,7 +240,7 @@ def main(args):
 
 if __name__ == "__main__":
 
-    fields = ["age", "skill", "belt", "gender", "handedness"]
+    fields = ["age", "skill", "belt", "gender", "handedness"] # Change this to change fields
     parser = argparse.ArgumentParser(
                     description='View correlations between all subjects in a directory')
 

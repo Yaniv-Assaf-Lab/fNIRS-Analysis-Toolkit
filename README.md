@@ -18,14 +18,14 @@ subjects = {
 }
 ```
 
-These are fields that are useful for our research specifically, but you are welcome to fork this project and modify them however you like, as it is not very difficult.
+These are fields that are useful for our research specifically, but you are welcome to fork this project and modify them however you like, with full instructions [below](#modifying-fields)
 
 Then, you will need a directory (set up as `data` in the makefile) which holds the subject's fNIRS data, in the Artinis OxySoft XML format, or a `.snirf` format. The file names for these must be in the following format:
 
 ```
 <SUBJECT_ID> <TRIAL>.snirf/.xml
 ```
-
+Please note that `SUBJECT_ID` may not contain spaces.
 Then, make sure the parameters in the makefile are satisfactory, install all of the Python libraries required to run the tools, and analyze to your heart's content.
 
 Note that on some Linux systems (e.g., Ubuntu with Wayland), you may need to set the `QT_QPA_PLATFORM` environment variable to wayland:
@@ -144,3 +144,11 @@ Remove all analyzed output files:
 ```
 make clean
 ```
+
+## Modifying fields
+
+In order to add/remove fields from this analysis toolkit for your own use, follow these instructions:
+
+1. Make sure all the subjects in `subjects.py` have all the fields needed. For subjects who did not fill a specific field, add an "unknown" value instead of leaving it empty.
+2. In the file `correlate.py`, under the `__main__` check, find the array `fields` and make sure the fields there are set to the fields you will need to sort, filter, or group by.
+3. Run your analysis to your heart's content. 
