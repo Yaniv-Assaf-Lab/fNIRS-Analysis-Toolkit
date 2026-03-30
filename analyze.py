@@ -72,18 +72,13 @@ def main(args):
 
         segments = extract_segments(df, marker_indices)
       
-        channels = [column[:9:2] for column in column_names][::2]
-        sensors = ["O2Hb, HHb"]
-        if(analysis["transform"] != None):
-            column_names = channels
-        else:
-            column_names = [f"{ch} {sensor}" for ch in channels for sensor in sensors]
 
+        if(analysis["transform"] != None):
+            column_names = [(column[:-4]) for column in column_names[::2]]
         if (analysis['transform'] == "subtract"):
             subtract_channels(segments, args["factor"])
         if (analysis['transform'] == "divide"):
             divide_channels(segments)
-        
         stacked = normalize_segments(segments)
         
         subject = subjects.get(id, 0)
