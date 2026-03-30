@@ -43,6 +43,9 @@ def load_snirf_file(file_path):
 
     raw_intensity = mne.io.read_raw_snirf(file_path, preload=True)
     raw_od = mne.preprocessing.nirs.optical_density(raw_intensity)
+    sci = mne.preprocessing.nirs.scalp_coupling_index(raw_od)
+    if(sci < 0.5):
+        print(f"Warning: Low scalp coupling index ({sci*100}%)")
     raw_haemo = mne.preprocessing.nirs.beer_lambert_law(raw_od, ppf=dpf) # ppf = 4.49 + 0.067 * age ** 0.814
     data_micromolar = raw_haemo.get_data() * 1e6
     column_names = []
