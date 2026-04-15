@@ -1,7 +1,4 @@
-def generate_title(analysis):
-    channel_count = 16
-    if(analysis['transform'] != None):
-        channel_count = 8
+def generate_title(analysis, channel_count):
     return f"{channel_count} channels | Transform: {analysis['transform']}"
 
 def generate_image_filename(prefix, analysis, id = None):

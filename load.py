@@ -1,4 +1,4 @@
-import pandas as pd
+import numpy as np
 import snirf as sn
 import mne
 import pandas as pd
@@ -43,7 +43,7 @@ def load_snirf_file(file_path):
 
     raw_intensity = mne.io.read_raw_snirf(file_path, preload=True)
     raw_od = mne.preprocessing.nirs.optical_density(raw_intensity)
-    sci = mne.preprocessing.nirs.scalp_coupling_index(raw_od)
+    sci = np.min(mne.preprocessing.nirs.scalp_coupling_index(raw_od) )
     if(sci < 0.5):
         print(f"Warning: Low scalp coupling index ({sci*100}%)")
     raw_haemo = mne.preprocessing.nirs.beer_lambert_law(raw_od, ppf=dpf) # ppf = 4.49 + 0.067 * age ** 0.814
@@ -83,6 +83,7 @@ def load_file(file_path):
     column_names = [f"{cn} {channel}" for cn in column_names for channel in ['hbo', 'hbr']]
 
     # Remove motion noise
+    mne.set_log_level('WARNING')
     info = mne.create_info(column_names, sample_rate, types)
     raw_df = mne.io.RawArray(df.to_numpy().transpose(), info)
     repaired = mne.preprocessing.nirs.temporal_derivative_distribution_repair(raw_df)

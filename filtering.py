@@ -1,5 +1,7 @@
 
 from scipy.signal import iirnotch, filtfilt
+from scipy.interpolate import interp1d
+from scipy import signal
 import pandas as pd
 import numpy as np
 
@@ -95,3 +97,34 @@ def divide_channels(segments):
         # Replace the DataFrame in the list with the new 8-column version
         segments[i] = pd.DataFrame(new_data)
 
+def find_offset_limited(template, trial, max_lag=None):
+    template = (template - 0.5) * 2
+
+    corr = signal.correlate(template, trial, mode='full', method='fft')
+    lags = signal.correlation_lags(len(template), len(trial), mode='full')
+    if max_lag is None:
+        max_lag = len(template)  # Default: No limit
+
+    # keep only desired lag range
+    mask = (lags >= -max_lag) & (lags <= max_lag)
+
+    corr = corr[mask]
+    lags = lags[mask]
+
+    return lags[np.argmax(corr)]
+
+
+def retime_segments(segments):
+    """Resample segments to shortest length, then subtract the mean."""
+    target_len = 25*20 # default sample rate is 25Hz, for 20 seconds
+    normalized = []
+
+    for seg in segments:
+        x_old = np.linspace(0, 1, len(seg))
+        x_new = np.linspace(0, 1, target_len)
+        interp = interp1d(x_old, seg.values, axis=0, kind='linear')
+        resampled = interp(x_new)
+        resampled = (resampled - resampled.mean(axis=0)) 
+        normalized.append(resampled)
+
+    return np.stack(normalized)
