@@ -8,6 +8,19 @@ from filtering import *
 from subjects import subjects
 import argparse
 
+
+def dict_equal_except(d1, d2, ignore_keys=None):
+    ignore_keys = set(ignore_keys or [])
+
+    keys1 = set(d1) - ignore_keys
+    keys2 = set(d2) - ignore_keys
+
+    if keys1 != keys2:
+        return False
+
+    return all(d1[k] == d2[k] for k in keys1)
+
+
 def main(args):
 
 
@@ -48,7 +61,8 @@ def main(args):
     if (template is not None):
         fNIRS_Data['analysis']['phase_locked'] = True
     
-    old_valid = fNIRS_Data_old and fNIRS_Data_old['analysis'] == fNIRS_Data['analysis']
+    old_valid = fNIRS_Data_old and dict_equal_except(fNIRS_Data_old['analysis'], fNIRS_Data['analysis'], ['phase_locked'])
+
     for i, f in enumerate(file_paths):
         file_stem = Path(f).stem
         subject_id = file_stem.split(sep = " ")[0]
@@ -57,14 +71,22 @@ def main(args):
             trial_idx = int(file_stem.split()[-1])
 
 
-        
-
         if (old_valid):
             old_trial = next((t for t in fNIRS_Data_old.get('trials', []) 
                 if t.get('subject_id') == subject_id and t.get('index') == trial_idx), None)
 
             if(old_trial):
-                print(f'Subject "{subject_id}" already analyzed, skipping... ({i + 1}/{len(file_paths)})')
+                if(fNIRS_Data['analysis']['phase_locked'] != fNIRS_Data_old['analysis']['phase_locked'] and fNIRS_Data['analysis']['phase_locked'] == True):
+                    print(f'Calculating offset for "{subject_id}"... ({i + 1}/{len(file_paths)})')
+                    offsets = []
+                    for j, stack in enumerate(old_trial['separate_stacks'][::2]): # HbO Only
+                    # for j, stack in enumerate(old_trial['separate_stacks']): 
+                        stack_t = np.transpose(stack)
+                        for _, run in enumerate(stack_t):
+                            offsets.append(find_offset_limited(template[::,j], run, len(stack) / 5))
+                    old_trial['offset'] = np.mean(np.array(offsets)) 
+                else:
+                    print(f'Subject "{subject_id}" already analyzed, skipping... ({i + 1}/{len(file_paths)})')
                 fNIRS_Data['trials'].append(old_trial)
                 continue        
                                  
@@ -101,13 +123,13 @@ def main(args):
         
         if(fNIRS_Data['analysis']['phase_locked']):
             offsets = []
-            # for j, stack in enumerate(trial['separate_stacks'][::2]): # HbO Only
-            for j, stack in enumerate(trial['separate_stacks']): # HbO Only
+            for j, stack in enumerate(trial['separate_stacks'][::2]): # HbO Only
+            # for j, stack in enumerate(trial['separate_stacks']): 
                 stack_t = np.transpose(stack)
                 for _, run in enumerate(stack_t):
                     offsets.append(find_offset_limited(template[::,j], run, len(stack) / 5))
             trial['offset'] = np.mean(np.array(offsets)) 
-            print(f"Mean offset: {np.mean(np.array(offsets))}, Median offset: {np.median(np.array(offsets))}, Delta offset: {np.mean(np.array(offsets)) - np.median(np.array(offsets))}")
+            # print(f"Mean offset: {np.mean(np.array(offsets))}, Median offset: {np.median(np.array(offsets))}, Delta offset: {np.mean(np.array(offsets)) - np.median(np.array(offsets))}")
         
         trial['stacks'] = retime_segments(segments)
         fNIRS_Data['trials'].append(trial)

@@ -19,10 +19,6 @@ belt_order = [
     "blck"
 ]
 
-# cross_correlation = correlate(means[i][:, ch], means[j][:, ch])
-# arraylength = len(means[i][:, ch])
-# max_correlation = np.argmax(cross_correlation[int(arraylength // 2) : int(arraylength * 1.5)])
-# sensor_corrs.append(max_correlation)
 
 
 def group_by_field(processed_data, field):
@@ -52,20 +48,24 @@ def plot_correlations(trials, set_names, analysis, args):
     """
     num_sets = len(trials)
     # means shape: (Trials, Time, Sensors)
-    # means = np.array([trial['stacks'].mean(axis=0) for trial in trials])[::,::,::2] # HbO Only
-    means = np.array([trial['stacks'].mean(axis=0) for trial in trials])
-    offsets = np.array([trial['offset'] for trial in trials])
+    means = np.array([trial['stacks'].mean(axis=0) for trial in trials])[::,::,::2] # HbO Only
+    # means = np.array([trial['stacks'].mean(axis=0) for trial in trials])
     
     num_sensors = means[0].shape[1]
 
 
     # Align trials according to offset
-    min_len = means.shape[1] - int(np.max(offsets) - np.min(offsets))
-    aligned = []
     if(args['offset']):
+        offsets = np.array([trial['offset'] for trial in trials]).astype(int)
+        offset_min = np.min(offsets)
+        offset_max = np.max(offsets)
+        signal_length = means.shape[1]
+        aligned_length = signal_length - (offset_max - offset_min)
+        aligned = []
         for i, mean in enumerate(means):
-            shifted = np.roll(mean, offsets[i])
-            aligned.append(shifted[:min_len])
+            start = offsets[i] - offset_min
+            end = start + aligned_length
+            aligned.append(mean[start:end])
 
         means = np.array(aligned)
 
