@@ -48,8 +48,8 @@ def plot_correlations(trials, set_names, analysis, args):
     """
     num_sets = len(trials)
     # means shape: (Trials, Time, Sensors)
-    means = np.array([trial['stacks'].mean(axis=0) for trial in trials])[::,::,::2] # HbO Only
-    # means = np.array([trial['stacks'].mean(axis=0) for trial in trials])
+    # means = np.array([trial['stacks'].mean(axis=0) for trial in trials])[::,::,::2] # HbO Only
+    means = np.array([trial['stacks'].mean(axis=0) for trial in trials])
     
     num_sensors = means[0].shape[1]
 

@@ -35,11 +35,19 @@ export QT_QPA_PLATFORM=wayland
 
 ## Analysis
 
-The analysis tool takes in files using a named format for each subject, cross references them with a subject's data in the file `subjects.py`, and outputs `.npz` files which include the subject's parameters. The tool also uses the `filtering.py` library to filter the data in a desired way before exporting.
+The analysis tool takes in files using a named format for each subject, cross references them with a subject's data in the file `subjects.py`, and output one `.npz` file which include the subject's parameters. The tool also uses the `filtering.py` library to filter the data in a desired way before exporting.
 
 ### Usage
 
 Execute `./analyze.py -h` (or `python analyze.py -h`) in order to get usage information and help.
+
+## Template Generation
+
+The template generation tool (`template.py`) takes an already analyzed `.npz` dataset and computes a generalized mean template across all subjects and trials. This template can then be fed back into the analysis tool to calculate alignment offsets (phase-locking) for future graphing and correlation.
+
+### Usage
+
+Execute `./template.py -h` (or `python template.py -h`) in order to get usage information and help.
 
 ## Graphing
 
@@ -81,8 +89,16 @@ At the top of the Makefile, you can configure the following:
 
 ### Available Commands
 
+#### Full Pipeline
+
+To start from a clean slate, and reach the correlation chart, simply run
+```
+make
+```
+And wait for the correlation window to show up (Yup, that's it).
+
 #### Analyze Data
-Run the full analysis pipeline on all raw files:
+To run the full analysis pipeline on all raw files:
 ```
 make analyze
 ```
