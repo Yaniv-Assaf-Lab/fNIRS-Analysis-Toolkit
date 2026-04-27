@@ -3,13 +3,12 @@ import sys
 import os
 import numpy as np
 from scipy.stats import pearsonr
+from scipy.signal import correlate, correlation_lags
 import matplotlib.pyplot as plt
 from pathlib import Path
 import argparse
 from filenames import generate_title, generate_image_filename
 from collections import defaultdict 
-
-p_value_threshold = 0.05
 
 belt_order = [
     "unkn",
@@ -19,6 +18,8 @@ belt_order = [
     "brwn",
     "blck"
 ]
+
+
 
 def group_by_field(processed_data, field):
     grouped = defaultdict(list)
@@ -33,26 +34,42 @@ def group_by_field(processed_data, field):
 
         result.append({
             'stack': combined_stack,
-            'id': key,
+            'subject_id': key,
             'subject': None,
             'trial': 0
         })
 
     return result
 
-def plot_correlations(stacks, set_names, analysis, args):
+def plot_correlations(trials, set_names, analysis, args):
     """
     Calculates Pearson correlation between mean trajectories.
     Works for both 16-channel and 8-channel.
     """
-    num_sets = len(stacks)
-    # means[i] shape: (Time, Sensors)
-    means = [s.mean(axis=0) for s in stacks] 
-    num_sensors = means[0].shape[1]
+    num_sets = len(trials)
+    # means shape: (Trials, Time, Sensors)
+    # means = np.array([trial['stacks'].mean(axis=0) for trial in trials])[::,::,::2] # HbO Only
+    means = np.array([trial['stacks'].mean(axis=0) for trial in trials])
     
-    # Define p-value threshold (adjust if this is a global variable in your script)
-    p_thresh = 0.05
+    num_sensors = means[0].shape[1]
 
+
+    # Align trials according to offset
+    if(args['offset']):
+        offsets = np.array([trial['offset'] for trial in trials]).astype(int)
+        offset_min = np.min(offsets)
+        offset_max = np.max(offsets)
+        signal_length = means.shape[1]
+        aligned_length = signal_length - (offset_max - offset_min)
+        aligned = []
+        for i, mean in enumerate(means):
+            start = offsets[i] - offset_min
+            end = start + aligned_length
+            aligned.append(mean[start:end])
+
+        means = np.array(aligned)
+
+    print(f"means shape: {means.shape}")
     # --- Matrix Calculation ---
     corr_matrix = np.zeros((num_sets, num_sets))
     for i in range(num_sets):
@@ -62,10 +79,13 @@ def plot_correlations(stacks, set_names, analysis, args):
             else:
                 sensor_corrs = []
                 for ch in range(num_sensors):
+                    
                     r, pvalue = pearsonr(means[i][:, ch], means[j][:, ch])
                     # Only include significant correlations, else treat as 0
-                    sensor_corrs.append((100 * r) if pvalue < p_thresh else 0)
+                    sensor_corrs.append((100 * r) if pvalue < 0.05 else 0)
+                    
                 corr_matrix[i, j] = np.mean(sensor_corrs)
+                # corr_matrix[i, j] = np.median(sensor_corrs)
 
     
     # --- Plot Heatmap ---
@@ -85,7 +105,7 @@ def plot_correlations(stacks, set_names, analysis, args):
             ax.text(j, i, f"{corr_matrix[i, j]:.0f}",
                     ha="center", va="center", color="black", fontweight="bold")
 
-    ax.set_title(f"Signal Correlation Between Subjects\n{generate_title(analysis)}")
+    ax.set_title(f"Signal Correlation Between Subjects\n{generate_title(analysis, means.shape[2])}")
 
     fig.tight_layout()
     if(args["save"]):
@@ -96,146 +116,67 @@ def plot_correlations(stacks, set_names, analysis, args):
     else:
        plt.show() 
 
-def plot_correlations_per_sensor(stacks, set_names, analysis, column_names, output_dir):
-    """
-    Calculates Pearson correlation between mean trajectories
-    and opens one NON-BLOCKING window per sensor.
-    """
-    plt.ion()  # Turn on interactive mode
-
-    num_sets = len(stacks)
-    means = [s.mean(axis=0) for s in stacks]
-    num_sensors = means[0].shape[1]
-
-    p_thresh = 0.05
-
-    # Compute correlation matrices per sensor
-    corr_matrices = np.zeros((num_sensors, num_sets, num_sets))
-
-    for ch in range(num_sensors):
-        for i in range(num_sets):
-            for j in range(num_sets):
-                if i == j:
-                    corr_matrices[ch, i, j] = 100.0
-                else:
-                    r, pvalue = pearsonr(means[i][:, ch], means[j][:, ch])
-                    corr_matrices[ch, i, j] = (100 * r) if pvalue < p_thresh else 0
-
-    # ---- Open separate NON-BLOCKING window per sensor ----
-    for ch in range(num_sensors):
-        plt.rcParams["figure.dpi"] = 67
-        px = 1/plt.rcParams['figure.dpi']  # pixel in inches
-        fig, ax = plt.subplots(figsize=(1024*px, 720*px)) #(width, height)
-        fig.canvas.manager.set_window_title(f"Sensor {ch+1}: {column_names[ch]}")
-
-        im = ax.imshow(corr_matrices[ch], cmap='RdYlGn', vmin=-100, vmax=100)
-
-        cbar = fig.colorbar(im, ax=ax)
-        cbar.set_label("Pearson Correlation (r) × 100")
-
-        ax.set_xticks(np.arange(num_sets))
-        ax.set_yticks(np.arange(num_sets))
-        ax.set_xticklabels(set_names, rotation=45, ha="right")
-        ax.set_yticklabels(set_names)
-
-        for i in range(num_sets):
-            for j in range(num_sets):
-                ax.text(j, i, f"{corr_matrices[ch, i, j]:.0f}",
-                        ha="center", va="center",
-                        color="black", fontweight="bold")
-
-
-        ax.set_title(f"Signal Correlation Between Subjects\n"
-                     f"Channel {ch+1} | {generate_title(analysis)}")
-
-        fig.tight_layout()
-
-        if(output_dir):
-            Path(output_dir).mkdir(parents=True, exist_ok=True)
-            
-            outfile = Path(output_dir) / generate_image_filename("correlations", analysis, id = column_names[ch])
-            plt.savefig(str(outfile), dpi=200) # Higher DPI for "meaningful" reports
-            print(f"Plot saved to: {outfile}")
-        else:
-            plt.show(block=False)  # <- Non-blocking
-            plt.pause(0.1)         # <- Ensures window renders properly
-
-    plt.show(block=True)
-    
 
 # ---------- MAIN ----------
 
-def main(args):
-    file_paths = []
-    with os.scandir(args["input_dir"]) as dir:
-        for entry in dir:
-            if entry.is_file():
-                file_paths.append(os.path.join(args["input_dir"], entry.name))
-                
-    # Use a list to store objects containing (skill, stack, name)
-    processed_data = []
-    column_names = ""
-    analysis = None
-    # 1. Process all files
-    for f in file_paths:
-        data = np.load(f, allow_pickle=True)
-        stack = data["stack"]
-        column_names = data["column_names"]
-        trial = data["trial"]
-        analysis = data['analysis'].item()
-        subject = data["subject"].item()
-        id = data["id"]
-        if(subject == 0):
-            print(f"Subject not found: {f}")
-            exit(1)
-        
-        # 3. Store as a tuple to keep them linked
-        processed_data.append({
-            'stack': stack,
-            'id': id,
-            'subject': subject,
-            'trial': trial
-        })
+def main(args):                
 
-    # 2. Sort the entire list by the 'skill' key
-    # Change reverse=True if you want most experienced first
+
+    # Load fNIRS Data
+    fNIRS_Data = None
+    if(os.path.isfile(args["input_file"])):
+        fNIRS_Data = np.load(args["input_file"], allow_pickle=True)['fNIRS_Data'].item()
+
+    # Process all trials into an array for filtering
+    trials_array = []
+    for trial in fNIRS_Data['trials']:
+        subject_id = trial["subject_id"]
+        if(subject_id == -1): # For skipping testing data
+            continue
+
+        trials_array.append(trial)
+
+    # Sort and filter
     if(args["sort"]):
-        processed_data.sort(
+        trials_array.sort(
             key=lambda x: belt_order.index(x["subject"][args["sort"]]) if x["subject"][args["sort"]] in belt_order else x["subject"][args["sort"]]
         ,reverse = True)
 
     if(args["filter"]):
         field, value = args["filter"]
-        processed_data = [
-            item for item in processed_data
+        trials_array = [
+            item for item in trials_array
             if item["subject"].get(field) == value
         ]
 
     if (args['group']):
-        processed_data = group_by_field(processed_data, args['group'])
-        processed_data.sort(
-            key=lambda x: belt_order.index(x['id']) if x['id'] in belt_order else x['id']
+        trials_array = group_by_field(trials_array, args['group'])
+        trials_array.sort(
+            key=lambda x: belt_order.index(x['subject_id']) if x['subject_id'] in belt_order else x['subject_id']
         ,reverse = True)
 
-    # 3. Unpack into separate lists for the correlation function
-    stacks = []
+    # Generate set names for the matrix
     set_names = []
-    for item in processed_data:
-        stacks.append(item['stack'])
+    for item in trials_array:
         subj = item['subject']
+
         if(args['sort'] and not args['group']):
-            set_names.append(f"{item['id']}_{item['trial']} ({subj[args['sort']]})")
-        else:
-            if(item['trial'] == 0):
-                set_names.append(f"{item['id']}")
+            if(item['index'] == 1):
+                set_names.append(f"{item['subject_id']} ({subj[args['sort']]})")
             else:
-                set_names.append(f"{item['id']}_{item['trial']}")
+                set_names.append(f"{item['subject_id']} [{item['index']}] ({subj[args['sort']]})")
+
+        else:
+            if(item['index'] == 1):
+                set_names.append(f"{item['subject_id']}")
+            else:
+                set_names.append(f"{item['subject_id']} [{item['index']}]")
 
     # Analyze Correlations
     if args["split"]:
-        plot_correlations_per_sensor(stacks, set_names, analysis, column_names, args['save'])
+        plot_correlations_per_sensor(trials_array, set_names, fNIRS_Data['analysis'], column_names, args['save'])
     else:
-        plot_correlations(stacks, set_names, analysis, args)
+        plot_correlations(trials_array, set_names, fNIRS_Data['analysis'], args)
 
 
 if __name__ == "__main__":
@@ -244,7 +185,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
                     description='View correlations between all subjects in a directory')
 
-    parser.add_argument('input_dir')
+    parser.add_argument('input_file')
     parser.add_argument('-s', '--sort', metavar = 'sort', choices = fields, help = 
                         "Allows sorting by a specified parameter"
                         )
@@ -260,6 +201,9 @@ if __name__ == "__main__":
     parser.add_argument('-a', '--save', metavar='save_dir', help = 
                         "Allows saving of the resulting matrix to an image."
                         )
-    
+    parser.add_argument('--offset', action=argparse.BooleanOptionalAction, default = True, help = 
+                        "Parameter to take offset into account, as long as the analyzed data includes it."
+                        )
+
     args = vars(parser.parse_args(sys.argv[1:]))
     main(args)
