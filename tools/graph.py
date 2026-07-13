@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from filenames import generate_title, generate_image_filename
+from lib.filenames import generate_title, generate_image_filename
 
 # ---------- PLOTTING ----------
 
