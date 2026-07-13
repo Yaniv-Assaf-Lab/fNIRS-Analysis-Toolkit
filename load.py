@@ -66,7 +66,7 @@ def load_snirf_file(file_path):
     return df, events, column_names, sample_rate
 
 
-def load_file(file_path):
+def load_file(file_path, tddr = False):
     _, extension = os.path.splitext(file_path)
     extension.lower()
     if(extension == ".snirf"):   
@@ -75,18 +75,22 @@ def load_file(file_path):
     elif(extension == ".xml"):     
         df, marker_indices, column_names, sample_rate = load_artinis_xml(file_path)
     else:
-        df, marker_indices, column_names, sample_rate = (0,0,0,0)
+        # Let error handling happen outside
+        df, marker_indices, column_names, sample_rate = (0,0,0,0) 
 
     # Standardize channel names: Sx_Dx {hbr/hbo}, Where S is for Source and D is for Detector
     column_names = [f'S{column[2]}_D{column[8]}' for column in column_names][::2]
     types = [('hbr' if i % 2 else 'hbo') for i in range (len(column_names * 2))]
     column_names = [f"{cn} {channel}" for cn in column_names for channel in ['hbo', 'hbr']]
 
-    # Remove motion noise
+    # Remove motion noise if flagged
     mne.set_log_level('WARNING')
     info = mne.create_info(column_names, sample_rate, types)
     raw_df = mne.io.RawArray(df.to_numpy().transpose(), info)
-    repaired = mne.preprocessing.nirs.temporal_derivative_distribution_repair(raw_df)
+    if(tddr):
+        repaired = mne.preprocessing.nirs.temporal_derivative_distribution_repair(raw_df)
+    else:
+        repaired = raw_df
     df = pd.DataFrame(repaired[:][0].transpose())
 
     return df, marker_indices, column_names, sample_rate

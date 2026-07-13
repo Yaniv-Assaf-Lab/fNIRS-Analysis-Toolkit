@@ -72,6 +72,51 @@ def remove_event(snirf2, events, index):
 
     print(f"Removed event: stim={stim_id}, row={row_id}, sample={sample_idx}")
 
+def add_event(snirf2, events, sample_rate, stim_id, onset_time, duration=0.0, value=1.0):
+    """
+    Add a new event.
+
+    Parameters
+    ----------
+    stim_id : int
+        Which stimulus block to add to.
+    onset_time : float
+        Time in seconds.
+    duration : float
+        Event duration (default 0).
+    value : float
+        Event value/amplitude (default 1).
+    """
+
+    if stim_id < 0 or stim_id >= len(snirf2.nirs[0].stim):
+        print("Invalid stim ID")
+        return
+
+    stim = snirf2.nirs[0].stim[stim_id]
+
+    new_row = np.array([[onset_time, duration, value]], dtype=stim.data.dtype)
+
+    # Append to stim block
+    stim.data = np.vstack((stim.data, new_row))
+
+    # Sort stim rows by onset time
+    order = np.argsort(stim.data[:, 0])
+    stim.data = stim.data[order]
+
+    # Rebuild event list (simplest and safest)
+    events.clear()
+    for s_id, s in enumerate(snirf2.nirs[0].stim):
+        for row_id, onset in enumerate(s.data[:, 0]):
+            sample_idx = int(onset * sample_rate)
+            events.append((s_id, row_id, sample_idx))
+
+    events.sort(key=lambda x: x[2])
+
+    print(
+        f"Added event: stim={stim_id}, "
+        f"time={onset_time:.3f}s "
+        f"(sample {int(onset_time * sample_rate)})"
+    )
 
 def main():
     path = sys.argv[1]
@@ -87,8 +132,9 @@ def main():
 === MENU ===
 1. List events
 2. Remove event
-3. Save modified SNIRF as new file
-4. Quit (without saving)
+3. Add event
+4. Save modified SNIRF as new file
+5. Quit (without saving)
 """)
         choice = input("Select: ").strip()
 
@@ -104,17 +150,39 @@ def main():
                 print("Invalid input")
 
         elif choice == "3":
+            print("\nAvailable stimulus IDs:")
+            for i, stim in enumerate(snirf2.nirs[0].stim):
+                print(f"  {i}: {stim.name}")
+
+            try:
+                stim_id = int(input("Stim ID: "))
+                onset = float(input("Onset time (seconds): "))
+                duration = input("Duration [0]: ").strip()
+                value = input("Value [1]: ").strip()
+
+                duration = float(duration) if duration else 0.0
+                value = float(value) if value else 1.0
+
+                add_event(
+                    snirf2,
+                    events,
+                    sample_rate,
+                    stim_id,
+                    onset,
+                    duration,
+                    value,
+                )
+
+            except ValueError:
+                print("Invalid input")
+        elif choice == "4":
             save_path = input("Save as: ").strip()
             snirf2.save(save_path)
             print(f"Saved to {save_path}")
 
-        elif choice == "4":
+        elif choice == "5":
             print("Exiting without saving.")
             break
-
-        else:
-            print("Invalid option.")
-
 
 if __name__ == "__main__":
     main()
