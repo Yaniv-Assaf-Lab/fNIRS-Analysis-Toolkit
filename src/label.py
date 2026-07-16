@@ -49,7 +49,7 @@ if __name__ == "__main__":
     parser.add_argument('-i','--input_dir', default="data/raw")
     parser.add_argument('-o','--output_dir', default="data/labeled")
     parser.add_argument('-d','--subject_data', default="data/subjects.csv")
-    parser.add_argument('-s','--strict', default = False, action=argparse.BooleanOptionalAction)   
+    # parser.add_argument('-s','--strict', default = False, action=argparse.BooleanOptionalAction)   
     args = vars(parser.parse_args(sys.argv[1:]))
 
     main(args)

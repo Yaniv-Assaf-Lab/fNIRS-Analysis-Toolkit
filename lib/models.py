@@ -39,8 +39,6 @@ class fNIRSTrial():
     subject_gender: Gender = Gender.m
     subject_handedness: Handedness = Handedness.u
 
-
-
     def hydrate_subject_data(self, row: pd.Series):
         """
         An instance method that reaches into a Pandas row

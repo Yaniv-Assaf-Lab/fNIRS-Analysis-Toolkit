@@ -1,14 +1,5 @@
 from pathlib import Path
 
-def title(analysis, channel_count):
-    return f"{channel_count} channels | Transform: {analysis['transform']}"
-
-def image_filename(prefix, analysis, id = None):
-    id_txt = ""
-    if (id != None):
-        id_txt = f"_{id}"
-    return f"{prefix}_{analysis['transform']}{id_txt}.png"
-
 def column_names(ch, num_channels = 16):
     tx = [1, 2, 3, 4]
     rx = [1, 3, 4, 5]
