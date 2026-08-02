@@ -3,8 +3,6 @@ from dataclasses import dataclass, field
 from typing import List, Any
 import pandas as pd
 
-
-
 class Belt(Enum):
     unkn = 0
     whte = 1
@@ -26,7 +24,8 @@ class Handedness(Enum):
 class fNIRSTrial():
     # Trial data
     data: pd.DataFrame = field(default_factory=pd.DataFrame) 
-    analysis_hash = 0
+    segments: list[float] = field(default_factory=list)
+    analysis_hash: str = ""
     trial_num: int = 0 # 0 is unlabeled, -1 is invalid, any other positive integer is a valid trial number
     sample_rate: int = 0
     event_indices: list[int] = field(default_factory=list)

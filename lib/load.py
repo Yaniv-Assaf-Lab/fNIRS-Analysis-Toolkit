@@ -32,7 +32,7 @@ def load_artinis_xml(file_path):
     return df, markers, sample_rate
 
 
-def load_snirf_file(file_path):
+def load_snirf_file(file_path, strict = False):
     mne.set_log_level('ERROR')
     result = sn.validateSnirf(file_path)
     assert result, 'Invalid SNIRF file!\n' + result.display()  # Crash and display issues if the file is invalid.
@@ -47,7 +47,13 @@ def load_snirf_file(file_path):
     if(sci < 0.5):
         subject_id = strings.subject_id_from_filename(file_path)
         trial_num = strings.trial_num_from_filename(file_path)
-        print(f"Warning: Low SCI for subject {subject_id}, trial {trial_num} ({(sci*100):.01f}%)")
+        if(not strict):
+            print(f"Warning: Low SCI for subject {subject_id}, trial {trial_num} ({(sci*100):.01f}%)")
+        if(strict):
+            print(f"Ignoring low SCI subject {subject_id}, trial {trial_num} ({(sci*100):.01f}%)")
+            return (0, 0, 0)
+
+
     raw_haemo = mne.preprocessing.nirs.beer_lambert_law(raw_od, ppf=dpf) # ppf = 4.49 + 0.067 * age ** 0.814
     data_micromolar = raw_haemo.get_data() * 1e6
     column_names = [strings.column_names(i) for i in range(16)]
@@ -67,12 +73,15 @@ def load_snirf_file(file_path):
     return df, events, sample_rate
 
 
-def load_file(file_path, tddr = False):
+def load_file(file_path, tddr = False, strict = False):
     trial_data = models.fNIRSTrial()
     _, extension = os.path.splitext(file_path)
     extension.lower()
     if(extension == ".snirf"):   
-        df, event_indices, sample_rate = load_snirf_file(file_path)
+        df, event_indices, sample_rate = load_snirf_file(file_path, strict)
+        if(sample_rate == 0):
+            trial_data.trial_num = -1 
+            return trial_data 
     elif(extension == ".xml"):     
         df, event_indices, sample_rate = load_artinis_xml(file_path)
     else:
