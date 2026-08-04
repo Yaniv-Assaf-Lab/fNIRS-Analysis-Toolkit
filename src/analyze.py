@@ -27,7 +27,7 @@ def main(args):
     for _, file in enumerate(input_files):
         # Check if we already analyzed this one
         output_filename = f"{args['output_dir']}/analyzed{file_index:04d}.npz"
-        if(os.path.isfile(output_filename)):
+        if(os.path.isfile(output_filename) and not args['force']):
             output_trial = np.load(output_filename, allow_pickle=True)["trial_data"].item()
             if(output_trial.analysis_hash == cfg_hash):
                 continue
@@ -40,7 +40,6 @@ def main(args):
         filtering.extract_segments(trial_data)
         filtering.cut_segments(trial_data)
         trial_data.analysis_hash = cfg_hash
-
         np.savez(output_filename, trial_data=trial_data)
         file_index += 1
 
@@ -54,6 +53,7 @@ if __name__ == "__main__":
 
     parser.add_argument('-i','--input_dir', default="data/labeled")
     parser.add_argument('-o','--output_dir', default="data/analyzed")
+    parser.add_argument('-f', '--force', action=argparse.BooleanOptionalAction, default=True)
     args = vars(parser.parse_args(sys.argv[1:]))
 
     main(args)

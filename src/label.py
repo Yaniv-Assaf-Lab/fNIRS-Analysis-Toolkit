@@ -26,7 +26,6 @@ def main(args):
         trial_data = load_file(file, strict = args["strict"])
         if(trial_data.trial_num == -1):
             continue
-        file_index += 1
         subject_id = strings.subject_id_from_filename(file)
         subject = subject_data.loc[subject_data['subject_id'] == subject_id]
 
@@ -41,6 +40,7 @@ def main(args):
         # Label the data
         trial_data.hydrate_subject_data(subject)
         np.savez(f"{args['output_dir']}/labeled{file_index:04d}.npz", trial_data=trial_data)
+        file_index += 1
         
 
     print(f"Labeled {file_index} subjects.")
