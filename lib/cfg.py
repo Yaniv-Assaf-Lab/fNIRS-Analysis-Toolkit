@@ -7,4 +7,4 @@ FILT_NOTCH_FREQ = 1.5
 
 ## Mode settings
 
-DIFF_MODE = True 
+DIFF_MODE = False 

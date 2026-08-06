@@ -10,24 +10,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_correlation_matrix(corr_matrix):
-    """
-    Visualizes a correlation matrix using a heatmap.
-    
-    Args:
-        corr_matrix (np.ndarray): The (N, N) Pearson correlation matrix.
-        channel_names (list of str, optional): Names for the sensors/channels.
-    """
-    
-    
-    return ax, cbar
-
 
 def main(args):
 
-    input_folder = Path(args['input_dir'])
+    input_folder = Path(args['inputdir'])
     input_files = [str(item) for item in input_folder.iterdir() if item.is_file()]
-    for _, file in enumerate(input_files):
+    for file_idx, file in enumerate(input_files):
         trial_data = np.load(file, allow_pickle=True)["trial_data"].item()
         segments = np.array(trial_data.segments)
 
@@ -43,7 +31,7 @@ def main(args):
         corr_matrix = np.corrcoef(channels_over_time)  # Shape: (N, N)
 
         # 1. Initialize the canvas and axis
-        fig, ax = plt.subplots(figsize=(8, 8))
+        fig, ax = plt.subplots(figsize=(12, 12))
         
         # 2. The Heatmap Ritual
         # vmin/vmax are locked to -1 and 1 to ensure consistent coloring across different datasets
@@ -79,18 +67,23 @@ def main(args):
                 ax.text(j, i, f"{val:.2f}", ha="center", va="center", 
                         color=color_text, fontsize=10)
 
-        # Adjust layout to prevent clipping of labels
+
         fig.tight_layout()
-        
-        # Title with a bit of flair
-        plt.title(trial_data.id)
-        plt.show()
+        plt.title(trial_data.subject_id)
+
+        if(args['outputdir'] is None):
+            plt.show()
+        else:
+            print(f"saving file: {args['outputdir']}/correlation{file_idx:04d}.png")
+            plt.savefig(f"{args['outputdir']}/correlation{file_idx:04d}.png")
+            plt.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
                     description='Template generator for data comparisons')
 
-    parser.add_argument('-i','--input_dir', default="data/templates")
+    parser.add_argument('-i','--inputdir', default="data/templates")
+    parser.add_argument('-o', '--outputdir', default=None)
     args = vars(parser.parse_args(sys.argv[1:]))
 
     main(args)

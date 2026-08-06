@@ -21,12 +21,12 @@ def get_file_md5(file_path):
 
 def main(args):
     cfg_hash = get_file_md5(cfg.__file__)
-    input_folder = Path(args['input_dir'])
+    input_folder = Path(args['inputdir'])
     input_files = [str(item) for item in input_folder.iterdir() if item.is_file()]
     file_index = 0 # Outside of for loop for real analysis count rather than file count
     for _, file in enumerate(input_files):
         # Check if we already analyzed this one
-        output_filename = f"{args['output_dir']}/analyzed{file_index:04d}.npz"
+        output_filename = f"{args['outputdir']}/analyzed{file_index:04d}.npz"
         if(os.path.isfile(output_filename) and not args['force']):
             output_trial = np.load(output_filename, allow_pickle=True)["trial_data"].item()
             if(output_trial.analysis_hash == cfg_hash):
@@ -51,8 +51,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
                     description='Analyzer for fNIRS data')
 
-    parser.add_argument('-i','--input_dir', default="data/labeled")
-    parser.add_argument('-o','--output_dir', default="data/analyzed")
+    parser.add_argument('-i','--inputdir', default="data/labeled")
+    parser.add_argument('-o','--outputdir', default="data/analyzed")
     parser.add_argument('-f', '--force', action=argparse.BooleanOptionalAction, default=True)
     args = vars(parser.parse_args(sys.argv[1:]))
 

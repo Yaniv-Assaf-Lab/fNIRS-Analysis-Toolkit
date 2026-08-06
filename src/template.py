@@ -20,7 +20,7 @@ def get_class_by_name(class_name):
 
 def main(args):
 
-    input_folder = Path(args['input_dir'])
+    input_folder = Path(args['inputdir'])
     input_files = [item for item in input_folder.iterdir() if item.is_file()]
     filter_members = set(get_class_by_name(args['parameter']))
     
@@ -35,19 +35,22 @@ def main(args):
             member_to_files[parameter_value].append(file_path)
 
     # Now we iterate through the members and immediately access their files.
-    for member in filter_members:
+    for _, member in enumerate(filter_members):
         # Initialize the template
-        output_filename = f"{args['output_dir']}/template_{member}.npz"
+        output_filename = f"{args['outputdir']}/template_{member}.npz"
         template = models.fNIRSTrial()
-        template.id = f"{args['parameter']} = {member}" 
 
         
         # Fill in the template
         assigned_files = member_to_files.get(member, [])
+        files_count = 0
         for file_path in assigned_files:
             fnirs_trial = np.load(file_path, allow_pickle=True)["trial_data"].item()
             template.segments.extend(fnirs_trial.segments)
+            files_count += 1
         
+        template.subject_id = f"{args['parameter']} = {member}, {files_count} subjects"
+
         np.savez(output_filename, trial_data=template)
 
 
@@ -56,8 +59,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
                     description='Template generator for data comparisons')
 
-    parser.add_argument('-i','--input_dir', default="data/analyzed")
-    parser.add_argument('-o','--output_dir', default="data/templates")
+    parser.add_argument('-i','--inputdir', default="data/analyzed")
+    parser.add_argument('-o','--outputdir', default="data/templates")
     parser.add_argument('-p', '--parameter', choices=["subject_belt", "subject_gender", "subject_handedness"], default="subject_belt")
     args = vars(parser.parse_args(sys.argv[1:]))
 
