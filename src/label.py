@@ -36,7 +36,9 @@ def main(args):
             error_msg = f"Subject {offending_id} has more than one instance. Aborting process."
             print(f"{error_msg}")
             raise ValueError(error_msg)
-        
+        if (len(subject) == 0):
+            error_msg = f"Subject {subject_id} has no instance in subject data. Aborting process."
+            raise ValueError(error_msg)
         # Label the data
         trial_data.hydrate_subject_data(subject)
         np.savez(f"{args['outputdir']}/labeled{file_index:04d}.npz", trial_data=trial_data)

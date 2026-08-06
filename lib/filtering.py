@@ -66,10 +66,19 @@ def extract_segments(trial):
     df = trial.data
     event_indices = trial.event_indices
     segments = []
+    
+    # Attempt to extract the segments from the provided indices
     for start_idx, end_idx in zip(event_indices[1:-2], event_indices[2:-1]):
         segment = df.iloc[start_idx + 1:end_idx].reset_index(drop=True)
         segments.append(segment)
-    trial.segments = segments
+    
+    # If segments remains unchanged, preserve the whole data as a single segment
+    if not segments:
+        # We return [df] rather than just df so that trial.segments 
+        # remains an iterable list of DataFrames, maintaining consistency.
+        trial.segments = [df]
+    else:
+        trial.segments = segments
 
 
 def cut_segments(trial, time = 15, min_sample_rate = 25):

@@ -19,7 +19,6 @@ def main(args):
         trial_data = np.load(file, allow_pickle=True)["trial_data"].item()
         segments = np.array(trial_data.segments)
 
-
         # Assume `segments` is the input array of shape (R, T, N)
         # 1. Collapse the repetition axis by averaging across all trials
         averaged = np.mean(segments, axis=0)          # Shape: (T, N)
