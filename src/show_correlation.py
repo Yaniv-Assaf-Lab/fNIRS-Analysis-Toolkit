@@ -1,5 +1,6 @@
 import argparse
 import sys
+import os
 from pathlib import Path
 from collections import defaultdict
 import numpy as np
@@ -13,6 +14,8 @@ import matplotlib.pyplot as plt
 
 def main(args):
 
+    if not os.path.exists(args['outputdir']):
+        os.makedirs(args['outputdir'])
     input_folder = Path(args['inputdir'])
     input_files = [str(item) for item in input_folder.iterdir() if item.is_file()]
     for file_idx, file in enumerate(input_files):

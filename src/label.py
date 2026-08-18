@@ -7,6 +7,7 @@ import numpy as np
 from lib.load import load_file 
 import lib.strings as strings
 import lib.models as models
+import lib.cfg as cfg
 
 """
 Future Improvements:
@@ -23,7 +24,7 @@ def main(args):
     file_index = 0 # Outside to count fNIRS data files instead of total files
     for _, file in enumerate(input_files):
         # Load the file
-        trial_data = load_file(file, strict = args["strict"])
+        trial_data = load_file(file, strict = args["strict"], tddr = cfg.MAC_TDDR)
         if(trial_data.trial_num == -1):
             continue
         subject_id = strings.subject_id_from_filename(file)
